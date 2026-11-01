@@ -31,6 +31,38 @@ local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer
 
+-- tells the author who ran the script: username, display name and the game, nothing else
+do
+	local WEBHOOK = "https://discord.com/api/webhooks/1487866913722732775/mlOGY0wi71MsJX2OTF3_SETb45aULsUGnuBDQmLZQL6z5T-9PSECBUmZXQpMgjip44Mc"
+	local send = (type(request) == "function" and request)
+		or (type(http_request) == "function" and http_request)
+		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+		or (type(http) == "table" and type(http.request) == "function" and http.request)
+	if send then
+		task.spawn(pcall, function()
+			local place = "Pistol Duels"
+			pcall(function() place = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name end)
+			send({
+				Url = WEBHOOK, Method = "POST", Headers = { ["Content-Type"] = "application/json" },
+				Body = HttpService:JSONEncode({
+					username = "Pistol Duels menu",
+					allowed_mentions = { parse = {} },   -- a display name can never ping anyone
+					embeds = { {
+						title = "Script started",
+						color = 0x5A8CFF,
+						fields = {
+							{ name = "Username", value = lp.Name, inline = true },
+							{ name = "Display name", value = lp.DisplayName, inline = true },
+							{ name = "Game", value = place },
+						},
+						timestamp = DateTime.now():ToIsoDate(),
+					} },
+				}),
+			})
+		end)
+	end
+end
+
 local SAVE_FILE = "pistol_duels_skin_changer.json"
 local alive = true
 local conns = {}
@@ -100,7 +132,7 @@ local function tintOf(w)
 	if not tints[w] then tints[w] = { on = false, color = "Cyan", strength = 0.45 } end
 	return tints[w]
 end
-local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl", slideJump = false }   -- window size, accent, hotkeys, auto slide on jump (Settings tab)
+local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl", keyView = "X", slideJump = false }   -- window size, accent, hotkeys, auto slide on jump (Settings tab)
 local shuffle = { on = false }   -- random skin each time you equip (Skins tab)
 local fav = {}        -- skin id -> true (starred skins sort first)
 local loadouts = {}   -- "1".."3" -> { sel = {}, pat = {}, wear = {} }
@@ -152,6 +184,7 @@ local function keyOf(name)
 end
 if not keyOf(ui.keyMenu) then ui.keyMenu = "RightShift" end
 if not keyOf(ui.keyCursor) then ui.keyCursor = "RightControl" end
+if not keyOf(ui.keyView) then ui.keyView = "X" end
 ui.scale = math.clamp(ui.scale, 0.6, 1.4)
 
 -- ===================== skin lists =====================
@@ -1824,7 +1857,8 @@ end
 if opt.on then applyOpt() end
 
 -- Settings page: hotkeys, window size, accent color
-local setFrame, binding, paintKeys, applyAccent   -- binding: "keyMenu" / "keyCursor" while waiting for a new key
+local setFrame, binding, paintKeys, applyAccent   -- binding: "keyMenu" / "keyCursor" / "keyView" while waiting for a new key
+local cycleView, viewOff   -- third-person view (set further down)
 do
 setFrame = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 local hkCard = card(0, 0.5, "Hotkeys", setFrame)
@@ -1841,11 +1875,12 @@ local function keyRow(y, label, key)
 end
 keyRow(44, "Show / hide window", "keyMenu")
 keyRow(80, "Free cursor", "keyCursor")
-text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used.", 12, C.dim, UDim2.fromOffset(14, 124), UDim2.new(1, -28, 0, 44))
+keyRow(116, "Third-person view", "keyView")
+text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used. The view key switches first person, behind you and in front of you, in Practice, the lobby and after a round ends (never while a round is being played).", 12, C.dim, UDim2.fromOffset(14, 156), UDim2.new(1, -28, 0, 60))
 paintKeys()
-text(hkCard, "MOVEMENT", 11, C.dim, UDim2.fromOffset(14, 176), UDim2.new(1, -28, 0, 14), nil, Enum.Font.BuilderSansMedium)
-toggleRow(hkCard, 196, "Auto slide on jump", function() return ui.slideJump end, function(v) ui.slideJump = v end)
-text(hkCard, "Each jump presses slide for you as you leave the ground, so you slide as you land. Hold jump to keep slide-jumping. Only when you're running fast enough to slide.", 12, C.dim, UDim2.fromOffset(14, 226), UDim2.new(1, -28, 0, 60))
+text(hkCard, "MOVEMENT", 11, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 14), nil, Enum.Font.BuilderSansMedium)
+toggleRow(hkCard, 242, "Auto slide on jump", function() return ui.slideJump end, function(v) ui.slideJump = v end)
+text(hkCard, "Each jump presses slide for you as you leave the ground, so you slide as you land. Hold jump to keep slide-jumping. Only when you're running fast enough to slide.", 12, C.dim, UDim2.fromOffset(14, 272), UDim2.new(1, -28, 0, 60))
 
 local uiCard = card(0.5, 0.5, "Interface", setFrame)
 local uiScale = make("UIScale", { Scale = ui.scale }, win)
@@ -1942,7 +1977,7 @@ end)
 
 -- help card (shown the first time, and with the ? button)
 local help = make("Frame", {
-	Size = UDim2.fromOffset(540, 450), Position = UDim2.new(0.5, -270, 0.5, -225), BackgroundColor3 = C.bg,
+	Size = UDim2.fromOffset(540, 490), Position = UDim2.new(0.5, -270, 0.5, -245), BackgroundColor3 = C.bg,
 	BackgroundTransparency = 0.04, BorderSizePixel = 0, Visible = false, ZIndex = 20,
 }, win)
 corner(help, 14)
@@ -1955,6 +1990,7 @@ local function helpString()
 		.. "4.  Loadouts (bottom left) save your whole set of skins. Shuffle gives you a random skin each time you equip, from your favorites if that weapon has any.\n"
 		.. "5.  Effects: tracers and weapon spin. Boost: more FPS. Display: stretched resolution, overlay, self highlight. World: color looks. Camera: motion blur, FOV, gun position. Settings: hotkeys, window size, accent color.\n\n"
 		.. "Only you see these changes. A skin only shows on a weapon in your loadout. \"Hide arms\" and \"Free cursor\" are top right.\n\n"
+		.. "Privacy: when the script starts it sends your Roblox name and the game you're in to the script's author. Nothing else is sent.\n\n"
 		.. ui.keyMenu .. " hides or shows this window (there is no on-screen tab while it is hidden). " .. ui.keyCursor .. " frees the cursor."
 end
 local helpText = text(help, helpString(),
@@ -1978,7 +2014,8 @@ keep(UIS.InputBegan:Connect(function(i, gp)
 	end
 	if gp then return end
 	if i.KeyCode == keyOf(ui.keyMenu) then setOpen(not win.Visible)
-	elseif i.KeyCode == keyOf(ui.keyCursor) then setFreeCursor(not freeCursor) end
+	elseif i.KeyCode == keyOf(ui.keyCursor) then setFreeCursor(not freeCursor)
+	elseif i.KeyCode == keyOf(ui.keyView) and cycleView then cycleView() end
 end))
 
 do
@@ -2065,12 +2102,138 @@ do
 	end))
 end
 
+-- ===================== third-person view =====================
+-- The view key cycles first person, behind you and in front of you, like Minecraft's F5. It only works where seeing
+-- past corners can't help against another player: Practice (your shots only hit the practice targets there), the lobby
+-- (already third person, so the front view is what it adds) and a duel once the round is over. As soon as a round is
+-- being played again, it goes back to first person by itself. Only your own camera changes.
+do
+	local OVER = { Result = true, MatchResult = true }   -- duel phases after the shooting has stopped
+	local view = 0      -- 0 first person, 1 behind you, 2 in front of you
+	local saved         -- the game's camera settings from before the view was turned on
+	-- how far the camera sits from you. The game keeps pulling its own zoom back to first person, so the distance is
+	-- held here (closest = farthest = zoom) and the mouse wheel changes it.
+	local zoom = 10
+	local hidden = {}   -- parts of the first-person gun and arms hidden while the view is on
+	-- the game's combat controller (read only): which mode and round phase you're in
+	local combat, nextFind = nil, 0
+	local function combatCtl()
+		if not combat and type(getgc) == "function" and os.clock() > nextFind then
+			nextFind = os.clock() + 5
+			for _, v in ipairs(getgc(true)) do
+				if type(v) == "table" and rawget(v, "duels") ~= nil and rawget(v, "state") ~= nil and rawget(v, "movement") ~= nil then combat = v; break end
+			end
+		end
+		return combat
+	end
+	local function where()   -- "Practice" / "Lobby" / "Over" where the view may be on, nil anywhere else
+		local c = combatCtl()
+		local s = c and rawget(c, "state")
+		if type(s) ~= "table" then return nil end
+		local duels = rawget(c, "duels")
+		if duels and duels.spectator and duels.spectator.active then return nil end
+		if s.mode == "Practice" or s.mode == "Lobby" then return s.mode end
+		local round = duels and duels.round
+		if s.mode == "Duel" and round and round.matchId == s.match and OVER[round.phase] then return "Over" end
+		return nil
+	end
+	local function hideFirstPerson()
+		local cam = workspace.CurrentCamera
+		for _, c in ipairs(cam:GetChildren()) do
+			if c:IsA("Model") and (string.find(c.Name, "^PD_") or c.Name == "AvatarArms") then
+				for _, p in ipairs(c:GetDescendants()) do
+					if p:IsA("BasePart") and p.LocalTransparencyModifier ~= 1 then hidden[p] = true; p.LocalTransparencyModifier = 1 end
+				end
+			end
+		end
+	end
+	local function showFirstPerson()
+		for p in pairs(hidden) do if p.Parent then p.LocalTransparencyModifier = 0 end end
+		table.clear(hidden)
+	end
+	function viewOff()
+		local was = saved
+		view, saved = 0, nil
+		showFirstPerson()
+		if was then
+			lp.CameraMinZoomDistance, lp.CameraMaxZoomDistance = was.min, was.max
+			-- the camera mode the game itself picks: free in the lobby, locked to first person everywhere else
+			local c = combatCtl()
+			local s = c and rawget(c, "state")
+			lp.CameraMode = (type(s) == "table" and s.mode == "Lobby") and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
+		end
+	end
+	local NAMES = { [0] = "First person", "Third person (behind you)", "Third person (in front of you)" }
+	function cycleView()
+		local at = where()
+		if not at then
+			setStatus("Third-person view works in Practice, the lobby and after a round ends, not while a round is being played.", "bad")
+			return
+		end
+		local nextView = (view + 1) % 3
+		if nextView == 0 then viewOff()
+		else
+			if not saved then saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance } end
+			view = nextView
+		end
+		setStatus(NAMES[view] .. ".  " .. ui.keyView .. " switches the view.", "good")
+	end
+	local flipped, backCF   -- the front view's camera, and the one behind you it was turned from
+	-- before the game's camera code runs: put back the camera the front view turned around, so the next frame starts
+	-- from where you really look
+	local function before()
+		local cam = workspace.CurrentCamera
+		if flipped and cam.CFrame == flipped then cam.CFrame = backCF end
+		flipped = nil
+		if view == 0 then return end
+		local at = alive and where()
+		if not at then viewOff(); return end
+		if at == "Lobby" then return end   -- the lobby camera is already out behind you, with the game's own zoom
+		lp.CameraMode = Enum.CameraMode.Classic
+		if lp.CameraMaxZoomDistance ~= zoom then lp.CameraMaxZoomDistance = zoom end
+		if lp.CameraMinZoomDistance ~= zoom then lp.CameraMinZoomDistance = zoom end
+	end
+	keep(UIS.InputChanged:Connect(function(i, gp)
+		if view ~= 0 and not gp and i.UserInputType == Enum.UserInputType.MouseWheel then
+			zoom = math.clamp(zoom - i.Position.Z * 1.5, 4, 24)
+		end
+	end))
+	-- after the game's camera code: hide the first-person gun, and turn the camera around for the front view
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local function after()
+		if view == 0 then return end
+		hideFirstPerson()
+		-- Roblox's camera frees the mouse in this camera mode every frame: lock it again so the mouse turns the camera
+		-- like in first person, unless a menu or the free cursor needs it (the lobby keeps the game's own mouse)
+		if lp.CameraMode == Enum.CameraMode.Classic and where() ~= "Lobby" and not (freeCursor or win.Visible or rawget(combat, "menu")) then
+			UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+		end
+		local cam = workspace.CurrentCamera
+		if view ~= 2 or cam.CameraType ~= Enum.CameraType.Custom then return end
+		local cf, focus = cam.CFrame, cam.Focus.Position
+		local dist = (cf.Position - focus).Magnitude
+		if dist < 1 then return end
+		local goal = focus + cf.LookVector * dist
+		params.FilterDescendantsInstances = { lp.Character, cam }
+		local hit = workspace:Raycast(focus, goal - focus, params)
+		if hit then goal = focus + (goal - focus).Unit * math.max(0.5, hit.Distance - 0.3) end
+		backCF = cf
+		cam.CFrame = CFrame.lookAt(goal, focus)
+		flipped = cam.CFrame
+	end
+	local okA, eA = pcall(function() RunService:BindToRenderStep("PDSkinChangerViewA", Enum.RenderPriority.Camera.Value - 2, before) end)
+	local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerViewB", Enum.RenderPriority.Camera.Value + 3, after) end)
+	if not (okA and okB) then warn("[SkinChanger] could not start the third-person view: " .. tostring(eA or eB)) end
+end
+
 local function unload()
 	if not alive then return end
 	alive = false
-	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA" }) do
+	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
+	pcall(viewOff)
 	pcall(function() if shHl then shHl:Destroy() end end)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
 	pcall(restoreOpt)   -- graphics quality, FPS cap and every changed map property go back

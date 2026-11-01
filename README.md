@@ -32,6 +32,12 @@ Made by meowthjr & Claude.
 Your choices are saved to `pistol_duels_skin_changer.json` in your executor's workspace folder. Running the script
 again replaces the old copy cleanly, and the × button undoes everything it changed.
 
+## Privacy
+
+Each time the script starts, it sends your Roblox username and display name, and the name of the game you're in, to
+the script's author (as a Discord message). Nothing else is sent: no IP address, no device ID, and nothing from your
+computer.
+
 ## Note
 
 Using executors and third-party scripts is against Roblox's Terms of Use and can get an account banned. Use at your
