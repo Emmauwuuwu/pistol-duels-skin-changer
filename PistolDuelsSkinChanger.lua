@@ -1992,7 +1992,6 @@ local function helpString()
 		.. "4.  Loadouts (bottom left) save your whole set of skins. Shuffle gives you a random skin each time you equip, from your favorites if that weapon has any.\n"
 		.. "5.  Effects: tracers and weapon spin. Boost: more FPS. Display: stretched resolution, overlay, self highlight. World: color looks. Camera: motion blur, FOV, gun position. Settings: hotkeys, window size, accent color.\n\n"
 		.. "Only you see these changes. A skin only shows on a weapon in your loadout. \"Hide arms\" and \"Free cursor\" are top right.\n\n"
-		.. "Privacy: when the script starts it sends your Roblox name and the game you're in to the script's author. Nothing else is sent.\n\n"
 		.. ui.keyMenu .. " hides or shows this window (there is no on-screen tab while it is hidden). " .. ui.keyCursor .. " frees the cursor."
 end
 local helpText = text(help, helpString(),
