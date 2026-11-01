@@ -34,11 +34,13 @@ local lp = Players.LocalPlayer
 -- tells the author who ran the script: username, display name and the game, nothing else
 do
 	local WEBHOOK = "https://discord.com/api/webhooks/1487866913722732775/mlOGY0wi71MsJX2OTF3_SETb45aULsUGnuBDQmLZQL6z5T-9PSECBUmZXQpMgjip44Mc"
+	-- usernames that never send a message (lower case)
+	local BLACKLIST = { oneplus_pro13 = true }
 	local send = (type(request) == "function" and request)
 		or (type(http_request) == "function" and http_request)
 		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
 		or (type(http) == "table" and type(http.request) == "function" and http.request)
-	if send then
+	if send and not BLACKLIST[string.lower(lp.Name)] then
 		task.spawn(pcall, function()
 			local place = "Pistol Duels"
 			pcall(function() place = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name end)
