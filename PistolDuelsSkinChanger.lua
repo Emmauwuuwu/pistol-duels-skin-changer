@@ -1526,29 +1526,77 @@ if wd.on then guarded("world", applyWorld) end
 
 -- ===================== self highlight =====================
 -- An outline/fill on YOUR OWN character only. Other players are never highlighted.
-local shHl
-do
-local function stepSelf()
-	local ch = lp.Character
-	if not (sh.on and ch) then
-		if shHl then shHl.Enabled = false end
-		return
-	end
-	if not shHl or not shHl.Parent then
-		shHl = Instance.new("Highlight")
-		shHl.Name = "PDSkinChangerSelf"
-		shHl.Parent = gui
-	end
-	local c = sh.color == "Rainbow" and Color3.fromHSV((os.clock() * 0.7) % 1, 0.85, 1) or TRACER_COLORS[sh.color] or TRACER_COLORS.Cyan
-	shHl.Adornee = ch
-	shHl.Enabled = true
-	shHl.FillColor = c; shHl.OutlineColor = c
-	shHl.FillTransparency = sh.fill; shHl.OutlineTransparency = sh.outline
-	shHl.DepthMode = sh.onTop and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
-end
-do local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerSelf", Enum.RenderPriority.Last.Value + 4, function() guarded("self highlight", stepSelf) end) end); if not okB then warn("[SkinChanger] could not start self highlight: " .. tostring(eB)) end end
-end
+local playerHighlights = {}
 
+do
+	local function stepPlayers()
+		if not sh.on then
+			for _, hl in pairs(playerHighlights) do
+				hl.Enabled = false
+			end
+			return
+		end
+
+		local c = sh.color == "Rainbow"
+			and Color3.fromHSV((os.clock() * 0.7) % 1, 0.85, 1)
+			or TRACER_COLORS[sh.color]
+			or TRACER_COLORS.Cyan
+
+		for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+			if player == lp then
+				continue
+			end
+
+			local ch = player.Character
+			if not ch then
+				if playerHighlights[player] then
+					playerHighlights[player].Enabled = false
+				end
+				continue
+			end
+
+			local hl = playerHighlights[player]
+
+			if not hl or not hl.Parent then
+				hl = Instance.new("Highlight")
+				hl.Name = "PDSkinChangerPlayer"
+				hl.Parent = gui
+				playerHighlights[player] = hl
+			end
+
+			hl.Adornee = ch
+			hl.Enabled = true
+			hl.FillColor = c
+			hl.OutlineColor = c
+			hl.FillTransparency = sh.fill
+			hl.OutlineTransparency = sh.outline
+			hl.DepthMode = sh.onTop
+				and Enum.HighlightDepthMode.AlwaysOnTop
+				or Enum.HighlightDepthMode.Occluded
+		end
+
+		for player, hl in pairs(playerHighlights) do
+			if player.Parent ~= game:GetService("Players") then
+				hl:Destroy()
+				playerHighlights[player] = nil
+			end
+		end
+	end
+
+	local okB, eB = pcall(function()
+		RunService:BindToRenderStep(
+			"PDSkinChangerPlayers",
+			Enum.RenderPriority.Last.Value + 4,
+			function()
+				guarded("player highlights", stepPlayers)
+			end
+		)
+	end)
+
+	if not okB then
+		warn("[SkinChanger] could not start player highlights: " .. tostring(eB))
+	end
+end
 -- Display page: stretched resolution, overlay, self highlight
 local dispPage = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 do
@@ -1570,7 +1618,7 @@ applyHud()
 
 local shCard = make("Frame", { Position = UDim2.new(2 / 3, 8, 0, 0), Size = UDim2.new(1 / 3, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
 corner(shCard, 12); stroke(shCard, 0.93)
-text(shCard, "Self highlight", 14, C.text, UDim2.fromOffset(14, 10), UDim2.new(1, -90, 0, 20), nil, Enum.Font.BuilderSansBold)
+text(shCard, "esp", 14, C.text, UDim2.fromOffset(14, 10), UDim2.new(1, -90, 0, 20), nil, Enum.Font.BuilderSansBold)
 toggleAt(shCard, UDim2.new(1, -52, 0, 12), function() return sh.on end, function(v) sh.on = v end)
 text(shCard, "Color", 12, C.dim, UDim2.fromOffset(14, 40), UDim2.new(1, -28, 0, 16))
 local shSw = {}
