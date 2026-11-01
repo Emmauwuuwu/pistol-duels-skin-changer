@@ -18,6 +18,8 @@ Made by meowthjr & Claude.
 - **World:** color looks, glow and sun rays. They can only darken the map, never brighten it.
 - **Camera:** motion blur on fast turns, field of view, weapon size and position.
 - **Settings:** rebindable hotkeys, window size, accent color.
+- **Auto slide on jump** (Settings): after each jump the slide key is pressed for you just before you land, so you
+  land straight into a slide. Hold jump to keep slide-jumping. Only when you're running fast enough to slide.
 
 ## How to use
 

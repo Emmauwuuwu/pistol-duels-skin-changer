@@ -16,7 +16,8 @@
 --      World tab: color looks, glow and sun rays on your own screen.
 --      Camera tab: motion blur, field of view and gun position.
 --      Boost tab: more FPS (lower graphics quality, FPS cap, no post effects / particles / decals, plain materials).
---      Settings tab: hotkeys, window size and accent color.
+--      Settings tab: hotkeys, window size, accent color, and Auto slide on jump (each jump presses slide for you,
+--      so you land in a slide; hold jump to keep slide-jumping).
 --   7. The panel right of the window shows a turning 3D preview of the skin under your mouse, and can tint your gun.
 --   8. Star skins to favorite them, save whole skin sets in Loadouts, or turn on Shuffle for a random skin per equip.
 --   Your choices are saved and come back the next time you run the script.
@@ -99,7 +100,7 @@ local function tintOf(w)
 	if not tints[w] then tints[w] = { on = false, color = "Cyan", strength = 0.45 } end
 	return tints[w]
 end
-local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl" }   -- window size, accent, hotkeys (Settings tab)
+local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl", slideJump = false }   -- window size, accent, hotkeys, auto slide on jump (Settings tab)
 local shuffle = { on = false }   -- random skin each time you equip (Skins tab)
 local fav = {}        -- skin id -> true (starred skins sort first)
 local loadouts = {}   -- "1".."3" -> { sel = {}, pat = {}, wear = {} }
@@ -1792,8 +1793,11 @@ local function keyRow(y, label, key)
 end
 keyRow(44, "Show / hide window", "keyMenu")
 keyRow(80, "Free cursor", "keyCursor")
-text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used.", 12, C.dim, UDim2.fromOffset(14, 124), UDim2.new(1, -28, 0, 60))
+text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used.", 12, C.dim, UDim2.fromOffset(14, 124), UDim2.new(1, -28, 0, 44))
 paintKeys()
+text(hkCard, "MOVEMENT", 11, C.dim, UDim2.fromOffset(14, 176), UDim2.new(1, -28, 0, 14), nil, Enum.Font.BuilderSansMedium)
+toggleRow(hkCard, 196, "Auto slide on jump", function() return ui.slideJump end, function(v) ui.slideJump = v end)
+text(hkCard, "Each jump presses slide for you as you leave the ground, so you slide as you land. Hold jump to keep slide-jumping. Only when you're running fast enough to slide.", 12, C.dim, UDim2.fromOffset(14, 226), UDim2.new(1, -28, 0, 60))
 
 local uiCard = card(0.5, 0.5, "Interface", setFrame)
 local uiScale = make("UIScale", { Scale = ui.scale }, win)
@@ -1938,6 +1942,79 @@ if seenHelp then
 	setStatus("Pick a weapon, click a skin. Only you see the change.")
 else
 	showHelp(true)
+end
+
+-- ===================== auto slide on jump =====================
+-- After each jump, the slide key is pressed for you just before you land (the same key you'd press: the game handles
+-- it exactly as yours). The game keeps a slide pressed in the air for only a moment (its landing buffer, 0.15 s), and
+-- a jump lasts longer than that, so the press waits until you're about to touch down: you land straight into a slide,
+-- and holding jump jumps you out of it again, a chain of slide-jumps. If you land before it got the chance (a step, a
+-- ledge), it presses as you land. It only presses when you're running fast enough to slide (slower, the game would
+-- crouch you instead) and never while you're already sliding (that would cancel the slide).
+do
+	local VIM = game:GetService("VirtualInputManager")
+	local MoveCfg
+	g(function() MoveCfg = require(RS.Combat.Config) end)
+	local BUFFER = MoveCfg and MoveCfg.Slide and tonumber(MoveCfg.Slide.LandingBuffer) or 0.15
+	local LEAD = math.clamp(BUFFER * 0.5, 0.03, 0.12)   -- press this long before touching down
+	local function fastEnough(hum, root)
+		local walk = (MoveCfg and MoveCfg.Prototype and tonumber(MoveCfg.Prototype.WalkSpeed) or 16) + 2
+		local min = MoveCfg and MoveCfg.Slide and tonumber(MoveCfg.Slide.MinSpeed) or 0
+		return hum.MoveDirection.Magnitude > 0.1 and (root.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > math.max(walk, min)
+	end
+	-- the game's movement controller (read only): is a slide running right now?
+	local ctl, nextFind = nil, 0
+	local function sliding()
+		if not ctl and type(getgc) == "function" and os.clock() > nextFind then
+			nextFind = os.clock() + 5
+			for _, v in ipairs(getgc(true)) do
+				if type(v) == "table" and rawget(v, "readyAt") ~= nil and rawget(v, "combat") ~= nil then ctl = v; break end
+			end
+		end
+		return ctl ~= nil and rawget(ctl, "active") ~= nil and rawget(ctl, "active") ~= false
+	end
+	local function pressSlide()
+		pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.C, false, game) end)
+		task.delay(0.05, function() pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.C, false, game) end) end)
+	end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	local armed = false   -- a jump is in the air and hasn't had its press yet
+	local hum, root, ch
+	local function ok() return alive and ui.slideJump and hum and root and not UIS:GetFocusedTextBox() end
+	local function hook(c)
+		ch = c
+		hum = c and c:WaitForChild("Humanoid", 5)
+		root = c and c:WaitForChild("HumanoidRootPart", 5)
+		armed = false
+		if not (alive and hum) then return end
+		keep(hum.StateChanged:Connect(function(_, new)
+			if new == Enum.HumanoidStateType.Jumping then
+				armed = true
+			elseif new == Enum.HumanoidStateType.Landed and armed then   -- landed before the press: press now
+				armed = false
+				if ok() and fastEnough(hum, root) and not sliding() then pressSlide() end
+			end
+		end))
+	end
+	keep(lp.CharacterAdded:Connect(hook))
+	if lp.Character then task.spawn(hook, lp.Character) end
+	keep(RunService.Heartbeat:Connect(function()
+		if not (armed and ok()) or hum.Parent ~= ch then return end
+		local vy = root.AssemblyLinearVelocity.Y
+		if vy >= 0 then return end   -- still going up
+		-- how long until the feet touch the ground at this fall speed
+		rayParams.FilterDescendantsInstances = { ch, workspace.CurrentCamera }
+		local hit = workspace:Raycast(root.Position, Vector3.new(0, -40, 0), rayParams)
+		if not hit then return end
+		local gap = (root.Position.Y - hit.Position.Y) - (hum.HipHeight + root.Size.Y / 2)
+		local fall, gravity = -vy, workspace.Gravity
+		local t = gap <= 0 and 0 or (-fall + math.sqrt(fall * fall + 2 * gravity * gap)) / gravity
+		if t <= LEAD then
+			armed = false
+			if fastEnough(hum, root) and not sliding() then pressSlide() end
+		end
+	end))
 end
 
 local function unload()
