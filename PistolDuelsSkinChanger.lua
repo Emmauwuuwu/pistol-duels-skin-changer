@@ -18,7 +18,8 @@
 --      Boost tab: more FPS (lower graphics quality, FPS cap, no post effects / particles / decals, plain materials).
 --      Settings tab: hotkeys, window size, accent color, and Auto slide on jump (each jump presses slide for you,
 --      so you land in a slide; hold jump to keep slide-jumping).
---   7. The panel right of the window shows a turning 3D preview of the skin under your mouse, and can tint your gun.
+--   7. The panel right of the window shows a turning 3D preview of the skin under your mouse, can tint your gun, and
+--      gives each weapon any ammo FX (tracer, sparks, muzzle flash, impacts, shot sound and kill effect).
 --   8. Star skins to favorite them, save whole skin sets in Loadouts, or turn on Shuffle for a random skin per equip.
 --   Your choices are saved and come back the next time you run the script.
 --   Note: a skin only shows up on a weapon that is in your loadout (the pistol slot or the knife slot).
@@ -37,24 +38,57 @@ local conns = {}
 local function keep(c) conns[#conns + 1] = c; return c end
 
 -- anonymous online counter: while the script runs it pings the counter every 2.5 minutes with a random id made up
--- for this run. No name or anything else about you is sent. The counts show on the counter's page.
-local ONLINE_URL = "https://pd-online.meowthjr.workers.dev"   -- the counter's address, empty = off
+-- for this run and the number of the server you're in (SERVER #n in the game's server list) with its region. No name
+-- or anything else about you is sent. The counts show on the counter's page.
 local onlineGone = function() end
 do
+	local ONLINE_URL = "https://pd-online.meowthjr.workers.dev"   -- the counter's address, empty = off
 	local send = (type(request) == "function" and request)
 		or (type(http_request) == "function" and http_request)
 		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
 		or (type(http) == "table" and type(http.request) == "function" and http.request)
 	if send and ONLINE_URL ~= "" then
 		local runId = HttpService:GenerateGUID(false)
+		-- the server number comes from the game's own server list (what its server browser asks for every 10 s while
+		-- it's open): asked once at the start and every 10 minutes, and also read whenever the browser gets a list
+		local server, region, lobby
+		local function askServer()
+			if not lobby and type(getgc) == "function" then
+				for _, v in ipairs(getgc(true)) do
+					if type(v) == "table" and rawget(v, "duels") ~= nil and rawget(v, "state") ~= nil and rawget(v, "movement") ~= nil then
+						local r = rawget(v, "remotes")
+						lobby = type(r) == "table" and r.Lobby or nil
+						break
+					end
+				end
+				if lobby then
+					keep(lobby.OnClientEvent:Connect(function(msg)
+						if type(msg) ~= "table" or msg.kind ~= "Servers" or type(msg.servers) ~= "table" then return end
+						for _, s in ipairs(msg.servers) do
+							if type(s) == "table" and (s.current == true or s.id == game.JobId) then
+								server, region = tonumber(s.number), type(s.region) == "string" and s.region or nil
+							end
+						end
+					end))
+				end
+			end
+			if lobby then pcall(function() lobby:FireServer({ kind = "Servers" }) end) end
+		end
 		local function ping(gone)
 			pcall(send, {
 				Url = ONLINE_URL .. "/ping", Method = "POST", Headers = { ["Content-Type"] = "application/json" },
-				Body = HttpService:JSONEncode({ id = runId, gone = gone or nil }),
+				Body = HttpService:JSONEncode({ id = runId, gone = gone or nil, server = server, region = region }),
 			})
 		end
 		task.spawn(function()
+			local beats = 0
 			while alive do
+				if beats % 4 == 0 then
+					pcall(askServer)
+					local t0 = os.clock()
+					while alive and not server and os.clock() - t0 < 5 do task.wait(0.2) end   -- the list takes a moment
+				end
+				beats += 1
 				ping(false)
 				task.wait(150)
 			end
@@ -123,6 +157,7 @@ local mb = { on = false, strength = 12, threshold = 120, smooth = 0.12 }   -- mo
 local vm = { on = false, fov = 0, size = 1, x = 0, y = 0, z = 0 }   -- field of view, gun size and position (Camera tab)
 local opt = { on = false, cap = 240, quality = 3, post = true, particles = true, textures = false, plain = false }   -- FPS boost (Boost tab)
 local tints = {}   -- weapon -> { on, color, strength }: each weapon's own tint (Skins tab, next to the preview)
+local ammoFx = {}  -- weapon -> ammo FX id ("Red", "Prism", "Bloxxed", or "None" for no FX); missing = the game's own
 local function tintOf(w)
 	if not tints[w] then tints[w] = { on = false, color = "Cyan", strength = 0.45 } end
 	return tints[w]
@@ -151,6 +186,7 @@ pcall(function()
 					tints[w] = { on = v.on == true, color = type(v.color) == "string" and v.color or "Cyan", strength = type(v.strength) == "number" and v.strength or 0.45 }
 				end
 			end; mergeInto(shuffle, d.shuffle)
+			for w, v in pairs(type(d.ammoFx) == "table" and d.ammoFx or {}) do if type(v) == "string" then ammoFx[w] = v end end
 			for k, v in pairs(type(d.fav) == "table" and d.fav or {}) do if v == true then fav[k] = true end end
 			for k, v in pairs(type(d.loadouts) == "table" and d.loadouts or {}) do
 				if type(v) == "table" and type(v.sel) == "table" then
@@ -168,7 +204,7 @@ local function save()
 	pcall(function()
 		if type(writefile) == "function" then
 			writefile(SAVE_FILE, HttpService:JSONEncode({ sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, sh = sh, wd = wd, mb = mb,
-				vm = vm, opt = opt, tints = tints, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
+				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
 end
@@ -476,6 +512,8 @@ function stepTracers()
 end
 end
 
+local fxApi = {}   -- unshot() puts the game's shot effect back; the ammo FX block below adds order, name, color, prism, unhook
+do
 local origShot, wrapShot
 if CE and type(CE.shot) == "function" then
 	origShot = CE.shot
@@ -499,6 +537,75 @@ if CE and type(CE.shot) == "function" then
 		return origShot(origin, endpoint, a3, a4, a5, muzzle, a7, ...)
 	end
 	g(function() CE.shot = wrapShot end)
+end
+fxApi.unshot = function() if CE and wrapShot and CE.shot == wrapShot then CE.shot = origShot end end
+end
+
+-- ===================== ammo FX =====================
+-- Ammo FX is what a skin copy can carry on top of its finish: a color (or Prism) for your bullets, tracer, sparks,
+-- muzzle flash, impacts and shot sound, and its own kill effect (Bloxxed is a kill effect only). The game asks its
+-- inventory which FX the weapon in your hands has, and uses the answer only for the effects on your own screen (the
+-- shot it sends the server has no FX in it). Answering with the one picked here changes how your shots look to you,
+-- and nothing else. Other players keep seeing your real FX.
+do
+local FXC
+g(function() FXC = require(RS.Cosmetics.AmmoFXCatalog) end)
+fxApi.color = function(id) return FXC and FXC.color(id) end
+fxApi.prism = FXC and FXC.Prism
+local FX_ORDER = { "Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Pink", "White", "Black", "Prism", "Bloxxed" }
+local fxCombat, fxCol, nextFxFind = nil, nil, 0
+local function fxName(id)
+	if id == nil then return "Your own" elseif id == "None" then return "No FX" end
+	return FXC and FXC.name(id) or id
+end
+fxApi.order, fxApi.name = FX_ORDER, fxName
+local function hookFx()   -- answer the game's "which FX does this weapon have?" with the pick (found once, read only)
+	if fxCol then return true end
+	if os.clock() < nextFxFind or type(getgc) ~= "function" then return false end
+	nextFxFind = os.clock() + 5
+	for _, v in ipairs(getgc(true)) do
+		if type(v) == "table" and rawget(v, "duels") ~= nil and rawget(v, "state") ~= nil and rawget(v, "movement") ~= nil then
+			local col = rawget(v, "collection")
+			local mt = type(col) == "table" and getmetatable(col)
+			local orig = mt and type(mt.__index) == "table" and mt.__index.fx
+			if type(orig) == "function" then
+				fxCombat, fxCol = v, col
+				rawset(col, "fx", function(self, w)
+					local pick = ammoFx[w]
+					if pick == "None" then return nil end
+					if pick then return pick end
+					return orig(self, w)
+				end)
+				return true
+			end
+		end
+	end
+	return false
+end
+hookFx()
+keep(RunService.Heartbeat:Connect(function() if not fxCol then hookFx() end end))
+-- kills by your own shots: the server sends the FX of the weapon that hit, so the kill effect follows the pick too
+local origDeath, wrapDeath
+if CE and type(CE.death) == "function" then
+	origDeath = CE.death
+	wrapDeath = function(fx, ...)
+		if select("#", ...) == 0 and type(fx) == "table" and fxCombat then   -- one argument = a kill confirmed for your shot
+			local s = rawget(fxCombat, "state")
+			local pick = type(s) == "table" and ammoFx[s.knife and "Knife" or s.preset]
+			if pick then
+				local copy = table.clone(fx)
+				copy.kind = (pick == "None") and "Default" or pick
+				return origDeath(copy)
+			end
+		end
+		return origDeath(fx, ...)
+	end
+	g(function() CE.death = wrapDeath end)
+end
+function fxApi.unhook()
+	g(function() if CE and wrapDeath and CE.death == wrapDeath then CE.death = origDeath end end)
+	if fxCol then rawset(fxCol, "fx", nil) end
+end
 end
 
 -- ===================== weapon spin =====================
@@ -732,7 +839,7 @@ end
 local applyHud
 local SIDE = 146   -- width of the menu on the left; every page sits to the right of it
 local win = make("Frame", {
-	Size = UDim2.fromOffset(640 + SIDE, 500), Position = UDim2.new(0.5, -(640 + SIDE) / 2, 0.5, -250), BackgroundColor3 = C.bg,
+	Size = UDim2.fromOffset(640 + SIDE, 556), Position = UDim2.new(0.5, -(640 + SIDE) / 2, 0.5, -278), BackgroundColor3 = C.bg,
 	BackgroundTransparency = 0.2, BorderSizePixel = 0,
 }, gui)
 corner(win, 14)
@@ -1318,6 +1425,51 @@ do
 		function(v) return math.floor(v * 100 + 0.5) .. " %" end)
 	text(previewPanel, "Paints over the skin's own texture. Lower strength keeps more of the original colors.", 11, C.dim, UDim2.fromOffset(14, 312), UDim2.new(1, -28, 0, 28))
 
+	-- ammo FX of the weapon picked on the left (see the ammo FX block above): "G" keeps the game's own, "-" none
+	text(previewPanel, "Ammo FX", 13, C.text, UDim2.fromOffset(14, 348), UDim2.fromOffset(70, 20))
+	local fxNow = text(previewPanel, "", 12, C.dim, UDim2.fromOffset(84, 349), UDim2.new(1, -98, 0, 20), Enum.TextXAlignment.Right)
+	fxNow.TextWrapped = false; fxNow.TextTruncate = Enum.TextTruncate.AtEnd
+	local function curFx() return ammoFx[current or weapons[1]] end
+	local fxRings = {}
+	local function paintFx()
+		local now = curFx()
+		for id, r2 in pairs(fxRings) do r2.Transparency = (id == (now or "Game")) and 0 or 1 end
+		fxNow.Text = fxApi.name(now)
+	end
+	local opts = { "Game", "None" }
+	for _, id in ipairs(fxApi.order) do opts[#opts + 1] = id end
+	for i, id in ipairs(opts) do
+		local col = (id == "Game" or id == "None") and C.white or (id == "Bloxxed" and Color3.fromRGB(70, 70, 80)) or fxApi.color(id) or C.white
+		local b = make("TextButton", {
+			Text = (id == "Game" and "G") or (id == "None" and "-") or (id == "Bloxxed" and "B") or "",
+			Position = UDim2.fromOffset(14 + ((i - 1) % 7) * 29, 374 + math.floor((i - 1) / 7) * 26), Size = UDim2.fromOffset(22, 22),
+			BackgroundColor3 = col, BackgroundTransparency = (id == "Game" or id == "None") and 0.85 or 0, AutoButtonColor = false,
+			TextColor3 = (id == "Game" or id == "None") and C.text or C.white, Font = Enum.Font.BuilderSansBold, TextSize = 12,
+		}, previewPanel)
+		corner(b, 11)
+		local prism = fxApi.prism
+		if id == "Prism" and prism then
+			local keys = {}
+			for k, c in ipairs(prism) do keys[#keys + 1] = ColorSequenceKeypoint.new((k - 1) / (#prism - 1), c) end
+			make("UIGradient", { Color = ColorSequence.new(keys), Rotation = 45 }, b)
+		end
+		fxRings[id] = make("UIStroke", { Color = C.text, Thickness = 2, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, b)
+		b.MouseEnter:Connect(function() fxNow.Text = fxApi.name(id ~= "Game" and id or nil) end)
+		b.MouseLeave:Connect(paintFx)
+		b.MouseButton1Click:Connect(function()
+			local w = current or weapons[1]
+			ammoFx[w] = (id ~= "Game") and id or nil
+			paintFx(); save()
+			local name = displayOf[w] or w
+			local _, held = heldModel()
+			if held == w then reEquip() end   -- the bullets in your gun get their FX when it's drawn
+			setStatus(ammoFx[w] and (fxApi.name(ammoFx[w]) .. " on your " .. name .. ". Only you see it. Your next shots use it.")
+				or ("Your " .. name .. " is back to its own ammo FX."), "good")
+		end)
+	end
+	paintFx()
+	repaints[#repaints + 1] = paintFx
+
 	local origColor = {}   -- SurfaceAppearance / part -> its own color, put back when the tint goes off
 	local function tintModel(m, c)
 		for _, d in ipairs(m:GetDescendants()) do
@@ -1853,7 +2005,7 @@ if opt.on then applyOpt() end
 
 -- Settings page: hotkeys, window size, accent color
 local setFrame, binding, paintKeys, applyAccent   -- binding: "keyMenu" / "keyCursor" / "keyView" while waiting for a new key
-local cycleView, viewOff   -- third-person view (set further down)
+local viewApi = {}   -- third-person view: cycle(), off() (set further down)
 do
 setFrame = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 local hkCard = card(0, 0.5, "Hotkeys", setFrame)
@@ -2009,7 +2161,7 @@ keep(UIS.InputBegan:Connect(function(i, gp)
 	if gp then return end
 	if i.KeyCode == keyOf(ui.keyMenu) then setOpen(not win.Visible)
 	elseif i.KeyCode == keyOf(ui.keyCursor) then setFreeCursor(not freeCursor)
-	elseif i.KeyCode == keyOf(ui.keyView) and cycleView then cycleView() end
+	elseif i.KeyCode == keyOf(ui.keyView) and viewApi.cycle then viewApi.cycle() end
 end))
 
 do
@@ -2145,7 +2297,7 @@ do
 		for p in pairs(hidden) do if p.Parent then p.LocalTransparencyModifier = 0 end end
 		table.clear(hidden)
 	end
-	function viewOff()
+	local function viewOff()
 		local was = saved
 		view, saved = 0, nil
 		showFirstPerson()
@@ -2158,7 +2310,8 @@ do
 		end
 	end
 	local NAMES = { [0] = "First person", "Third person (behind you)", "Third person (in front of you)" }
-	function cycleView()
+	viewApi.off = viewOff
+	function viewApi.cycle()
 		local at = where()
 		if not at then
 			setStatus("Third-person view works in Practice, the lobby and after a round ends, not while a round is being played.", "bad")
@@ -2216,9 +2369,11 @@ do
 		cam.CFrame = CFrame.lookAt(goal, focus)
 		flipped = cam.CFrame
 	end
-	local okA, eA = pcall(function() RunService:BindToRenderStep("PDSkinChangerViewA", Enum.RenderPriority.Camera.Value - 2, before) end)
-	local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerViewB", Enum.RenderPriority.Camera.Value + 3, after) end)
-	if not (okA and okB) then warn("[SkinChanger] could not start the third-person view: " .. tostring(eA or eB)) end
+	local okV, eV = pcall(function()
+		RunService:BindToRenderStep("PDSkinChangerViewA", Enum.RenderPriority.Camera.Value - 2, before)
+		RunService:BindToRenderStep("PDSkinChangerViewB", Enum.RenderPriority.Camera.Value + 3, after)
+	end)
+	if not okV then warn("[SkinChanger] could not start the third-person view: " .. tostring(eV)) end
 end
 
 local function unload()
@@ -2227,7 +2382,7 @@ local function unload()
 	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
-	pcall(viewOff)
+	pcall(viewApi.off)
 	pcall(onlineGone)
 	pcall(function() if shHl then shHl:Destroy() end end)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
@@ -2246,7 +2401,9 @@ local function unload()
 		if WM.createAnimated == wrapCA then WM.createAnimated = origCreateAnimated end
 		if WM.create == wrapC then WM.create = origCreate end
 		if FC and FC.bind == wrapBind then FC.bind = origBind end
-		if CE and wrapShot and CE.shot == wrapShot then CE.shot = origShot end	end)
+		fxApi.unshot()
+	end)
+	pcall(fxApi.unhook)
 	for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
 	pcall(function() gui:Destroy() end)
 	_G.PistolDuelsSkinChanger = nil
@@ -2257,6 +2414,6 @@ _G.PistolDuelsSkinChanger = {
 	unload = unload, sel = sel, pat = pat, wear = wear, hits = function() return hits end, reEquip = reEquip,
 	setHideArms = setHideArms, hideArms = function() return hideArms end,
 	setFreeCursor = setFreeCursor, freeCursor = function() return freeCursor end,
-	tr = tr, spin = spin, st = st, hud = hud, sh = sh, wd = wd, mb = mb, vm = vm, opt = opt, applyOpt = applyOpt, tints = tints, showPreview = function(id) showPreview(id) end, ui = ui, fav = fav, loadouts = loadouts, shuffle = shuffle, applyWorld = applyWorld, tracer = spawnTracer,
+	tr = tr, spin = spin, st = st, hud = hud, sh = sh, wd = wd, mb = mb, vm = vm, opt = opt, applyOpt = applyOpt, tints = tints, ammoFx = ammoFx, showPreview = function(id) showPreview(id) end, ui = ui, fav = fav, loadouts = loadouts, shuffle = shuffle, applyWorld = applyWorld, tracer = spawnTracer,
 }
 print(("[SkinChanger] ready: %d weapons, %d skins"):format(#weapons, (function() local n = 0 for _, l in pairs(skinsOf) do n += #l end return n end)()))

@@ -11,6 +11,9 @@ Made by meowthjr & Claude.
   Favorites (★), three loadout slots, and a shuffle mode that rolls a random skin each time you equip.
 - **3D preview:** a turning preview of the skin under your mouse.
 - **Tint:** recolors a skin's own texture (blue on Emerald comes out blue-green). Each weapon has its own tint.
+- **Ammo FX:** give each weapon any ammo FX (Reaper, Blaze, Static, Phantom, Frostbite, Tide, Rift, Starfall, Gale,
+  Eclipse, Prism, or the Bloxxed kill effect): your tracer, sparks, muzzle flash, impacts, shot sound and kill effect
+  change with it. Only you see it.
 - **Effects:** bullet tracers on your own shots, and a spin on your own weapon model.
 - **Boost:** more FPS. Lower graphics quality, FPS cap, and optionally no post effects, particles or decals, plus
   plain materials. Everything goes back when you turn it off.
@@ -35,8 +38,8 @@ again replaces the old copy cleanly, and the × button undoes everything it chan
 ## Privacy
 
 While the script runs, it sends an anonymous ping every few minutes so the author can see how many people are using
-it. The ping holds only a random id made up for that one run: no username, no device ID, and nothing from your
-computer.
+it. The ping holds only a random id made up for that one run and the number of the server you're in (as shown in the
+game's server list, with its region): no username, no device ID, and nothing from your computer.
 
 ## Note
 
