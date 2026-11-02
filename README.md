@@ -37,9 +37,11 @@ again replaces the old copy cleanly, and the × button undoes everything it chan
 
 ## Privacy
 
-While the script runs, it sends an anonymous ping every few minutes so the author can see how many people are using
-it. The ping holds only a random id made up for that one run and the number of the server you're in (as shown in the
-game's server list, with its region): no username, no device ID, and nothing from your computer.
+While the script runs, it sends an anonymous ping every 30 seconds so the author can see how many people are using
+it. The ping holds only a random id made up for that run, a random id the script keeps in your executor's workspace
+(`pistol_duels_online_id.txt`, so switching servers doesn't count you twice; delete the file to get a new one), and the
+number of the server you're in (as shown in the game's server list, with its region): no username, no device ID, and
+nothing from your computer.
 
 ## Note
 

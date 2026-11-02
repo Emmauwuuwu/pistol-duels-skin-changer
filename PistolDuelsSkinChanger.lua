@@ -37,18 +37,25 @@ local alive = true
 local conns = {}
 local function keep(c) conns[#conns + 1] = c; return c end
 
--- anonymous online counter: while the script runs it pings the counter every 2.5 minutes with a random id made up
--- for this run and the number of the server you're in (SERVER #n in the game's server list) with its region. No name
--- or anything else about you is sent. The counts show on the counter's page.
+-- anonymous online counter: while the script runs it pings the counter every 30 seconds with a random id made up for
+-- this run, a random id kept on this PC (so switching servers doesn't count you twice) and the number of the server
+-- you're in (SERVER #n in the game's server list) with its region. No name or anything else about you is sent. The
+-- counts show on the counter's page.
 local onlineGone = function() end
 do
 	local ONLINE_URL = "https://pd-online.meowthjr.workers.dev"   -- the counter's address, empty = off
+	local ID_FILE = "pistol_duels_online_id.txt"
 	local send = (type(request) == "function" and request)
 		or (type(http_request) == "function" and http_request)
 		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
 		or (type(http) == "table" and type(http.request) == "function" and http.request)
 	if send and ONLINE_URL ~= "" then
 		local runId = HttpService:GenerateGUID(false)
+		local userId   -- made up the first time and kept in the executor's workspace; nil if the executor has no files
+		pcall(function()
+			if type(isfile) == "function" and isfile(ID_FILE) then userId = string.match(readfile(ID_FILE), "%x+%-%x+%-%x+%-%x+%-%x+") end
+			if not userId and type(writefile) == "function" then userId = HttpService:GenerateGUID(false); writefile(ID_FILE, userId) end
+		end)
 		-- the server number comes from the game's own server list (what its server browser asks for every 10 s while
 		-- it's open): asked once at the start and every 10 minutes, and also read whenever the browser gets a list
 		local server, region, lobby
@@ -77,20 +84,20 @@ do
 		local function ping(gone)
 			pcall(send, {
 				Url = ONLINE_URL .. "/ping", Method = "POST", Headers = { ["Content-Type"] = "application/json" },
-				Body = HttpService:JSONEncode({ id = runId, gone = gone or nil, server = server, region = region }),
+				Body = HttpService:JSONEncode({ id = runId, user = userId, gone = gone or nil, server = server, region = region }),
 			})
 		end
 		task.spawn(function()
 			local beats = 0
 			while alive do
-				if beats % 4 == 0 then
+				if beats % 20 == 0 then   -- every 10 minutes
 					pcall(askServer)
 					local t0 = os.clock()
 					while alive and not server and os.clock() - t0 < 5 do task.wait(0.2) end   -- the list takes a moment
 				end
 				beats += 1
 				ping(false)
-				task.wait(150)
+				task.wait(30)
 			end
 		end)
 		onlineGone = function() task.spawn(ping, true) end
