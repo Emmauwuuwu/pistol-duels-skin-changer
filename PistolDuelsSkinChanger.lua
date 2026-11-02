@@ -573,7 +573,7 @@ local function hookFx()   -- answer the game's "which FX does this weapon have?"
 				rawset(col, "fx", function(self, w)
 					local pick = ammoFx[w]
 					if pick == "None" then return nil end
-					if pick then return pick end
+					if pick and pick ~= "Bloxxed" then return pick end   -- Bloxxed is a kill effect only (see wrapDeath)
 					return orig(self, w)
 				end)
 				return true
@@ -686,7 +686,33 @@ local function guarded(name, fn)
 	local ok, e = pcall(fn)
 	if not ok and not fxWarned[name] then fxWarned[name] = true; warn("[SkinChanger] " .. name .. " error: " .. tostring(e)) end
 end
-local function stepFx() guarded("tracers", stepTracers); guarded("gun position", stepViewmodel); guarded("spin", stepSpin) end
+-- the game's ammo FX coats (the glowing layer on your rounds) were put on them before the gun is moved or spun here:
+-- move the ones on the gun along with it, so they don't stay behind where the game had put the gun
+local stepFx
+do
+local function followCoats(m, before)
+	local after = m:GetPivot()
+	if after == before then return end
+	local folder = workspace:FindFirstChild("PDAmmoFX")
+	if not folder then return end
+	local delta = after * before:Inverse()
+	local cf, size = m:GetBoundingBox()
+	local was, half = delta:Inverse() * cf, size / 2 + Vector3.new(0.3, 0.3, 0.3)
+	for _, c in ipairs(folder:GetChildren()) do
+		if c:IsA("BasePart") then
+			local p = was:PointToObjectSpace(c.Position)
+			if math.abs(p.X) <= half.X and math.abs(p.Y) <= half.Y and math.abs(p.Z) <= half.Z then c.CFrame = delta * c.CFrame end
+		end
+	end
+end
+function stepFx()
+	guarded("tracers", stepTracers)
+	local m = (vm.on or spin.on) and heldModel()
+	local before = m and m:GetPivot()
+	guarded("gun position", stepViewmodel); guarded("spin", stepSpin)
+	if before then guarded("ammo fx", function() followCoats(m, before) end) end
+end
+end
 do local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerFx", Enum.RenderPriority.Last.Value + 2, stepFx) end); if not okB then warn("[SkinChanger] could not start PDSkinChangerFx: " .. tostring(eB)) end end
 
 -- ===================== stretched resolution =====================
