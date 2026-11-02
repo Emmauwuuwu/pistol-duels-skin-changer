@@ -34,8 +34,8 @@ again replaces the old copy cleanly, and the × button undoes everything it chan
 
 ## Privacy
 
-Each time the script starts, it sends your Roblox username and display name, and the name of the game you're in, to
-the script's author (as a Discord message). Nothing else is sent: no IP address, no device ID, and nothing from your
+While the script runs, it sends an anonymous ping every few minutes so the author can see how many people are using
+it. The ping holds only a random id made up for that one run: no username, no device ID, and nothing from your
 computer.
 
 ## Note

@@ -31,44 +31,37 @@ local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer
 
--- tells the author who ran the script: username, display name and the game, nothing else
-do
-	local WEBHOOK = "https://discord.com/api/webhooks/1487866913722732775/mlOGY0wi71MsJX2OTF3_SETb45aULsUGnuBDQmLZQL6z5T-9PSECBUmZXQpMgjip44Mc"
-	-- usernames that never send a message (lower case)
-	local BLACKLIST = { oneplus_pro13 = true }
-	local send = (type(request) == "function" and request)
-		or (type(http_request) == "function" and http_request)
-		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
-		or (type(http) == "table" and type(http.request) == "function" and http.request)
-	if send and not BLACKLIST[string.lower(lp.Name)] then
-		task.spawn(pcall, function()
-			local place = "Pistol Duels"
-			pcall(function() place = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name end)
-			send({
-				Url = WEBHOOK, Method = "POST", Headers = { ["Content-Type"] = "application/json" },
-				Body = HttpService:JSONEncode({
-					username = "Pistol Duels menu",
-					allowed_mentions = { parse = {} },   -- a display name can never ping anyone
-					embeds = { {
-						title = "Script started",
-						color = 0x5A8CFF,
-						fields = {
-							{ name = "Username", value = lp.Name, inline = true },
-							{ name = "Display name", value = lp.DisplayName, inline = true },
-							{ name = "Game", value = place },
-						},
-						timestamp = DateTime.now():ToIsoDate(),
-					} },
-				}),
-			})
-		end)
-	end
-end
-
 local SAVE_FILE = "pistol_duels_skin_changer.json"
 local alive = true
 local conns = {}
 local function keep(c) conns[#conns + 1] = c; return c end
+
+-- anonymous online counter: while the script runs it pings the counter every 2.5 minutes with a random id made up
+-- for this run. No name or anything else about you is sent. The counts show on the counter's page.
+local ONLINE_URL = "https://pd-online.meowthjr.workers.dev"   -- the counter's address, empty = off
+local onlineGone = function() end
+do
+	local send = (type(request) == "function" and request)
+		or (type(http_request) == "function" and http_request)
+		or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+		or (type(http) == "table" and type(http.request) == "function" and http.request)
+	if send and ONLINE_URL ~= "" then
+		local runId = HttpService:GenerateGUID(false)
+		local function ping(gone)
+			pcall(send, {
+				Url = ONLINE_URL .. "/ping", Method = "POST", Headers = { ["Content-Type"] = "application/json" },
+				Body = HttpService:JSONEncode({ id = runId, gone = gone or nil }),
+			})
+		end
+		task.spawn(function()
+			while alive do
+				ping(false)
+				task.wait(150)
+			end
+		end)
+		onlineGone = function() task.spawn(ping, true) end
+	end
+end
 
 -- the game's modules can only be required from a thread with identity 2 (executors run at 8), so anything that
 -- touches them goes through g(): it runs the function in such a thread, waits for it, and returns pcall's results
@@ -2235,6 +2228,7 @@ local function unload()
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
 	pcall(viewOff)
+	pcall(onlineGone)
 	pcall(function() if shHl then shHl:Destroy() end end)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
 	pcall(restoreOpt)   -- graphics quality, FPS cap and every changed map property go back
