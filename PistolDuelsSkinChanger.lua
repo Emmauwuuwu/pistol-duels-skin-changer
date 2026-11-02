@@ -3,7 +3,7 @@
 -- WHAT IT DOES
 --   Pick any Glock, Tec-9, Deagle or Knife skin and your own gun shows it, even skins you don't own.
 --   Only YOU see the change. Other players, your inventory, trades and purchases are not touched.
---   Skins that only exist for staff (admin_*) are left out on purpose.
+--   Skins that only staff can give out are listed too, marked Staff at the end of each weapon's list.
 --
 -- HOW TO USE
 --   1. Run the script. A window opens. RightShift hides or shows it.
@@ -228,18 +228,21 @@ g(function()
 	for _, w in ipairs(order) do
 		local list = {}
 		for id, it in pairs(SkinCatalog.Items) do
-			if it.weapon == w and not it.adminOnly and not it.standard and not string.find(tostring(id), "^admin_") then
+			if it.weapon == w and not it.standard then
+				-- skins only staff can be given are listed too, marked Staff and kept at the end of the list
+				local staff = it.adminOnly == true or string.find(tostring(id), "^admin_") ~= nil
 				local c = colors[it.rarity]
 				local s = {
-					id = id, display = it.name or id, rarity = tostring(it.rarity or ""),
-					color = typeof(c) == "Color3" and c or nil, patterned = it.procedural ~= nil, weapon = w,
+					id = id, display = it.name or id, rarity = staff and "Staff" or tostring(it.rarity or ""),
+					color = typeof(c) == "Color3" and c or nil, patterned = it.procedural ~= nil, weapon = w, staff = staff,
+					exclusiveFx = type(it.exclusiveFx) == "string" and it.exclusiveFx or nil,   -- FX that comes with the skin
 				}
 				list[#list + 1] = s
 				byId[id] = s
 			end
 		end
 		table.sort(list, function(a, b)
-			local ra, rb = RANK[a.rarity] or 99, RANK[b.rarity] or 99
+			local ra, rb = a.staff and 100 or RANK[a.rarity] or 99, b.staff and 100 or RANK[b.rarity] or 99
 			if ra ~= rb then return ra < rb end
 			return string.lower(a.display) < string.lower(b.display)
 		end)
@@ -273,9 +276,11 @@ local function pickFor(w)
 	if not shuffle.on then return sel[w], pat[w], wear[w] end
 	local now = os.clock()
 	if not rolled[w] or now - (rollAt[w] or 0) > 0.5 then
-		local list, favs = skinsOf[w] or {}, {}
-		for _, s in ipairs(list) do if fav[s.id] then favs[#favs + 1] = s end end
-		local from = #favs > 0 and favs or list
+		local favs, rest = {}, {}
+		for _, s in ipairs(skinsOf[w] or {}) do
+			if fav[s.id] then favs[#favs + 1] = s elseif not s.staff then rest[#rest + 1] = s end   -- Staff skins only when starred
+		end
+		local from = #favs > 0 and favs or rest
 		local s = from[math.random(1, math.max(#from, 1))]
 		rolled[w] = s and { id = s.id, pat = math.random(1, 1000), wear = math.random() * 0.4 } or nil
 	end
@@ -559,6 +564,12 @@ local function fxName(id)
 	return FXC and FXC.name(id) or id
 end
 fxApi.order, fxApi.name = FX_ORDER, fxName
+-- the FX a weapon gets: the one picked here, else the one that comes with its skin (the Linked Sword's Bloxxed)
+local function pickOf(w)
+	if ammoFx[w] then return ammoFx[w] end
+	local id = (shuffle.on and rolled[w] and rolled[w].id) or sel[w]
+	return id and byId[id] and byId[id].exclusiveFx or nil
+end
 local function hookFx()   -- answer the game's "which FX does this weapon have?" with the pick (found once, read only)
 	if fxCol then return true end
 	if os.clock() < nextFxFind or type(getgc) ~= "function" then return false end
@@ -571,7 +582,7 @@ local function hookFx()   -- answer the game's "which FX does this weapon have?"
 			if type(orig) == "function" then
 				fxCombat, fxCol = v, col
 				rawset(col, "fx", function(self, w)
-					local pick = ammoFx[w]
+					local pick = pickOf(w)
 					if pick == "None" then return nil end
 					if pick and pick ~= "Bloxxed" then return pick end   -- Bloxxed is a kill effect only (see wrapDeath)
 					return orig(self, w)
@@ -591,7 +602,7 @@ if CE and type(CE.death) == "function" then
 	wrapDeath = function(fx, ...)
 		if select("#", ...) == 0 and type(fx) == "table" and fxCombat then   -- one argument = a kill confirmed for your shot
 			local s = rawget(fxCombat, "state")
-			local pick = type(s) == "table" and ammoFx[s.knife and "Knife" or s.preset]
+			local pick = type(s) == "table" and pickOf(s.knife and "Knife" or s.preset)
 			if pick then
 				local copy = table.clone(fx)
 				copy.kind = (pick == "None") and "Default" or pick
@@ -2410,7 +2421,8 @@ local function unload()
 	end
 	pcall(viewApi.off)
 	pcall(onlineGone)
-	pcall(function() if shHl then shHl:Destroy() end end)
+	for _, hl in pairs(playerHighlights) do pcall(function() hl:Destroy() end) end
+	table.clear(playerHighlights)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
 	pcall(restoreOpt)   -- graphics quality, FPS cap and every changed map property go back
 	pcall(previewCleanup)
