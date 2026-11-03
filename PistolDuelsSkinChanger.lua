@@ -1,3 +1,4 @@
+pcall(function() game:GetService("RunService"):UnbindFromRenderStep("PDSkinChangerPlayers") end)
 -- PISTOL DUELS | Skin Changer (local only)  |  made by meowthjr & Claude
 --
 -- WHAT IT DOES
@@ -151,6 +152,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
+local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -158,7 +160,6 @@ local tr = { on = false, color = "Cyan", thick = 0.12, life = 0.6, glow = true, 
 local spin = { on = false, speed = 180, dir = 1, axis = "Y", mode = "Continuous" }
 local st = { on = false, amount = 0.35 }   -- stretched resolution (Display tab)
 local hud = { on = false, keys = true, stats = true, px = 24, py = 240 }   -- keystrokes + FPS/ping overlay (Display tab)
-local sh = { on = false, color = "Cyan", fill = 0.65, outline = 0.0, onTop = true }   -- highlight on your own character (Display tab)
 local wd = { on = false, preset = "Natural", tint = 1, sat = 0, con = 0, dark = 0, bloom = 0, rays = 0 }   -- World look (World tab)
 local mb = { on = false, strength = 12, threshold = 120, smooth = 0.12 }   -- motion blur when turning fast (Camera tab)
 local vm = { on = false, fov = 0, size = 1, x = 0, y = 0, z = 0 }   -- field of view, gun size and position (Camera tab)
@@ -186,7 +187,7 @@ pcall(function()
 			for k, v in pairs(type(d.wear) == "table" and d.wear or {}) do if type(v) == "number" then wear[k] = v end end
 			seenHelp = d.seenHelp == true
 			hideArms = d.hideArms == true
-			mergeInto(tr, d.tr); mergeInto(spin, d.spin); mergeInto(st, d.st); mergeInto(hud, d.hud); mergeInto(sh, d.sh); mergeInto(wd, d.wd); mergeInto(mb, d.mb)
+			mergeInto(sa.esp, d.esp); mergeInto(sa, d.sa); sa.on = false; sa.cameraOn = false; mergeInto(tr, d.tr); mergeInto(spin, d.spin); mergeInto(st, d.st); mergeInto(hud, d.hud); mergeInto(wd, d.wd); mergeInto(mb, d.mb)
 			mergeInto(vm, d.vm); mergeInto(opt, d.opt); mergeInto(ui, d.ui)
 			for w, v in pairs(type(d.tints) == "table" and d.tints or {}) do
 				if type(v) == "table" then
@@ -210,12 +211,13 @@ end)
 local function save()
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, sh = sh, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
 end
 
+sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000)
 local function keyOf(name)
 	local ok, k = pcall(function() return Enum.KeyCode[name] end)
 	return ok and k or nil
@@ -767,7 +769,7 @@ local function applyFov()
 	cam.FieldOfView = fovSet
 end
 do local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerStretchA", 1, function() unstretch(); unFov() end) end); if not okB then warn("[SkinChanger] could not start stretch: " .. tostring(eB)) end end
-do local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerStretchB", Enum.RenderPriority.Last.Value + 3, function() guarded("stretch", applyStretch); guarded("fov", applyFov) end) end); if not okB then warn("[SkinChanger] could not start stretch: " .. tostring(eB)) end end
+do local okB, eB = pcall(function() RunService:BindToRenderStep("PDSkinChangerStretchB", Enum.RenderPriority.Last.Value + 3, function(dt) if sa.cameraStep then guarded("aim assist", function() sa.cameraStep(dt) end) end; guarded("stretch", applyStretch); guarded("fov", applyFov) end) end); if not okB then warn("[SkinChanger] could not start stretch: " .. tostring(eB)) end end
 end
 
 -- ===================== motion blur =====================
@@ -890,7 +892,7 @@ corner(win, 14)
 stroke(win, 0.86)
 
 -- no on-screen tab when hidden (so nobody can see you use it): RightShift brings the window back
-local function setOpen(open) win.Visible = open end
+local function setOpen(open) sa.menuOpen = open; win.Visible = open end
 
 -- header: title on the left, arms switch + small buttons on the right
 local top = make("Frame", { Size = UDim2.new(1, 0, 0, 52), BackgroundTransparency = 1 }, win)
@@ -995,7 +997,7 @@ do
 	local side = make("Frame", { Position = UDim2.fromOffset(10, 62), Size = UDim2.new(0, SIDE - 18, 1, -72), BackgroundColor3 = C.white, BackgroundTransparency = 0.96, BorderSizePixel = 0 }, win)
 	corner(side, 12); stroke(side, 0.94)
 	text(side, "MENU", 10, C.dim, UDim2.fromOffset(14, 10), UDim2.new(1, -28, 0, 12), nil, Enum.Font.BuilderSansMedium)
-	for i, t in ipairs({ { "skins", "Skins" }, { "fx", "Effects" }, { "boost", "Boost" }, { "display", "Display" }, { "world", "World" }, { "camera", "Camera" }, { "settings", "Settings" } }) do
+	for i, t in ipairs({ { "skins", "Skins" }, { "fx", "Effects" }, { "boost", "Boost" }, { "display", "Display" }, { "world", "World" }, { "camera", "Camera" }, { "settings", "Settings" }, { "aim", "Not So Legit" } }) do
 		local b = make("TextButton", {
 			Position = UDim2.fromOffset(6, 28 + (i - 1) * 36), Size = UDim2.new(1, -12, 0, 32), BackgroundColor3 = C.white, BackgroundTransparency = 1,
 			Text = t[2], TextColor3 = C.dim, Font = Enum.Font.BuilderSansMedium, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false,
@@ -1748,90 +1750,17 @@ do
 end
 if wd.on then guarded("world", applyWorld) end
 
--- ===================== self highlight =====================
--- An outline/fill on YOUR OWN character only. Other players are never highlighted.
-local playerHighlights = {}
-
-do
-	local function stepPlayers()
-		if not sh.on then
-			for _, hl in pairs(playerHighlights) do
-				hl.Enabled = false
-			end
-			return
-		end
-
-		local c = sh.color == "Rainbow"
-			and Color3.fromHSV((os.clock() * 0.7) % 1, 0.85, 1)
-			or TRACER_COLORS[sh.color]
-			or TRACER_COLORS.Cyan
-
-		for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-			if player == lp then
-				continue
-			end
-
-			local ch = player.Character
-			if not ch then
-				if playerHighlights[player] then
-					playerHighlights[player].Enabled = false
-				end
-				continue
-			end
-
-			local hl = playerHighlights[player]
-
-			if not hl or not hl.Parent then
-				hl = Instance.new("Highlight")
-				hl.Name = "PDSkinChangerPlayer"
-				hl.Parent = gui
-				playerHighlights[player] = hl
-			end
-
-			hl.Adornee = ch
-			hl.Enabled = true
-			hl.FillColor = c
-			hl.OutlineColor = c
-			hl.FillTransparency = sh.fill
-			hl.OutlineTransparency = sh.outline
-			hl.DepthMode = sh.onTop
-				and Enum.HighlightDepthMode.AlwaysOnTop
-				or Enum.HighlightDepthMode.Occluded
-		end
-
-		for player, hl in pairs(playerHighlights) do
-			if player.Parent ~= game:GetService("Players") then
-				hl:Destroy()
-				playerHighlights[player] = nil
-			end
-		end
-	end
-
-	local okB, eB = pcall(function()
-		RunService:BindToRenderStep(
-			"PDSkinChangerPlayers",
-			Enum.RenderPriority.Last.Value + 4,
-			function()
-				guarded("player highlights", stepPlayers)
-			end
-		)
-	end)
-
-	if not okB then
-		warn("[SkinChanger] could not start player highlights: " .. tostring(eB))
-	end
-end
--- Display page: stretched resolution, overlay, self highlight
+-- Display page: stretched resolution and overlay
 local dispPage = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 do
-local stCard = make("Frame", { Size = UDim2.new(1 / 3, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
+local stCard = make("Frame", { Size = UDim2.new(0.5, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
 corner(stCard, 12); stroke(stCard, 0.93)
 text(stCard, "Stretched resolution", 14, C.text, UDim2.fromOffset(14, 10), UDim2.new(1, -90, 0, 20), nil, Enum.Font.BuilderSansBold)
 toggleAt(stCard, UDim2.new(1, -52, 0, 12), function() return st.on end, function(v) st.on = v end)
 slider(stCard, 48, "Stretch", 0, 0.7, 0.01, function() return st.amount end, function(v) st.amount = v end, function(v) return math.floor(v * 100 + 0.5) .. " %" end)
 text(stCard, "Makes everything look wider by flattening your view vertically, like a stretched monitor setting. Only your own screen changes; other players and the game are not affected. Your weapon and arms stretch with the view.", 12, C.dim, UDim2.fromOffset(14, 100), UDim2.new(1, -28, 0, 150))
 
-local ovCard = make("Frame", { Position = UDim2.new(1 / 3, 4, 0, 0), Size = UDim2.new(1 / 3, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
+local ovCard = make("Frame", { Position = UDim2.new(0.5, 4, 0, 0), Size = UDim2.new(0.5, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
 corner(ovCard, 12); stroke(ovCard, 0.93)
 text(ovCard, "Overlay", 14, C.text, UDim2.fromOffset(14, 10), UDim2.new(1, -90, 0, 20), nil, Enum.Font.BuilderSansBold)
 toggleAt(ovCard, UDim2.new(1, -52, 0, 12), function() return hud.on end, function(v) hud.on = v; applyHud() end)
@@ -1840,33 +1769,6 @@ toggleRow(ovCard, 82, "FPS and ping", function() return hud.stats end, function(
 text(ovCard, "A small box with your movement keys, mouse buttons, FPS and ping. Drag it anywhere (turn on Free cursor first if you are in first person). It stays visible when you hide this window.", 12, C.dim, UDim2.fromOffset(14, 120), UDim2.new(1, -28, 0, 150))
 applyHud()
 
-local shCard = make("Frame", { Position = UDim2.new(2 / 3, 8, 0, 0), Size = UDim2.new(1 / 3, -8, 1, 0), BackgroundColor3 = C.white, BackgroundTransparency = 0.95, BorderSizePixel = 0 }, dispPage)
-corner(shCard, 12); stroke(shCard, 0.93)
-text(shCard, "esp", 14, C.text, UDim2.fromOffset(14, 10), UDim2.new(1, -90, 0, 20), nil, Enum.Font.BuilderSansBold)
-toggleAt(shCard, UDim2.new(1, -52, 0, 12), function() return sh.on end, function(v) sh.on = v end)
-text(shCard, "Color", 12, C.dim, UDim2.fromOffset(14, 40), UDim2.new(1, -28, 0, 16))
-local shSw = {}
-for i, name in ipairs(COLOR_ORDER) do
-	local b = make("TextButton", {
-		Text = name == "Rainbow" and "R" or "", Position = UDim2.fromOffset(14 + (i - 1) * 26, 58), Size = UDim2.fromOffset(20, 20),
-		BackgroundColor3 = TRACER_COLORS[name] or Color3.fromRGB(255, 160, 60), AutoButtonColor = false, TextColor3 = C.bg,
-		Font = Enum.Font.BuilderSansBold, TextSize = 11,
-	}, shCard)
-	corner(b, 10)
-	local ring = make("UIStroke", { Color = C.text, Thickness = 2, Transparency = 1 }, b)
-	shSw[name] = ring
-	b.MouseButton1Click:Connect(function()
-		sh.color = name
-		for n2, r2 in pairs(shSw) do r2.Transparency = (n2 == sh.color) and 0 or 1 end
-		save()
-	end)
-end
-repaints[#repaints + 1] = function() for n2, r2 in pairs(shSw) do r2.Transparency = (n2 == sh.color) and 0 or 1 end end
-for n2, r2 in pairs(shSw) do r2.Transparency = (n2 == sh.color) and 0 or 1 end
-slider(shCard, 90, "Fill", 0, 1, 0.05, function() return 1 - sh.fill end, function(v) sh.fill = 1 - v end, function(v) return math.floor(v * 100 + 0.5) .. " %" end)
-slider(shCard, 130, "Outline", 0, 1, 0.05, function() return 1 - sh.outline end, function(v) sh.outline = 1 - v end, function(v) return math.floor(v * 100 + 0.5) .. " %" end)
-toggleRow(shCard, 172, "Show over everything", function() return sh.onTop end, function(v) sh.onTop = v end)
-text(shCard, "Outlines and tints your own character, like a glow. Only you and only your character: other players are not affected and nothing about them is shown. In first person you mostly see it on your arms and legs.", 12, C.dim, UDim2.fromOffset(14, 204), UDim2.new(1, -28, 0, 110))
 
 end
 
@@ -2094,12 +1996,280 @@ end
 text(uiCard, "The window resizes when you let go of the slider. The overlay keeps its own size.", 12, C.dim, UDim2.fromOffset(14, 150), UDim2.new(1, -28, 0, 60))
 end
 
+-- Silent Aim: use the game's existing direction input and hit calculations.
+sa.page = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
+sa.cleanup = function() end
+do
+    -- Drawing and targeting share a pixel radius in viewport coordinates.
+    function sa.circleContains(camera, position)
+        local projected, onScreen = camera:WorldToViewportPoint(position)
+        local center = camera.ViewportSize * 0.5
+        local dx, dy = projected.X - center.X, projected.Y - center.Y
+        local distanceSquared = dx * dx + dy * dy
+        return onScreen and projected.Z > 0 and distanceSquared <= sa.radius * sa.radius, distanceSquared
+    end
+    local ring = make("Frame", { Name = "SilentAimFOV", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, Visible = false }, gui)
+    make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, ring)
+    local outline = make("UIStroke", { Color = C.accent, Thickness = 1.5, Transparency = 0.15, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ring)
+    accentObjs[#accentObjs + 1] = { outline, "Color" }
+    keep(RunService.RenderStepped:Connect(function()
+        local cam = workspace.CurrentCamera
+        ring.Visible = alive and sa.showFov and cam ~= nil
+        if not ring.Visible then return end
+        local center = cam.ViewportSize * 0.5
+        ring.Position = UDim2.fromOffset(center.X, center.Y)
+        local width, height = sa.radius * 2, sa.radius * 2
+        ring.Size = UDim2.fromOffset(width, height)
+    end))
+    local ctl, origAttack, origAim, wrappedAttack, wrappedAim, priorAttack, priorAim
+    local depth = 0
+    local raycast
+    local ok = g(function()
+        raycast = require(RS.Combat.CombatRaycast)
+        if type(filtergc) == "function" then
+            ctl = filtergc("table", { Keys = { "duels", "state", "movement" } }, true)
+        elseif type(getgc) == "function" then
+            for _, value in ipairs(getgc(true)) do
+                if type(value) == "table" and rawget(value, "duels") and rawget(value, "state") and rawget(value, "movement") then ctl = value; break end
+            end
+        end
+        assert(ctl and type(ctl.attack) == "function" and type(ctl.aimHit) == "function", "Combat controller unavailable")
+        origAttack, origAim = ctl.attack, ctl.aimHit
+        priorAttack, priorAim = rawget(ctl, "attack"), rawget(ctl, "aimHit")
+    end)
+    local ready = ok and ctl and origAttack and origAim and raycast
+    local function choose(self, reach)
+        local camera = workspace.CurrentCamera
+        if not camera or not lp.Character then return end
+        local origin = camera.CFrame.Position
+        local bestDistance = math.huge
+        local best, bestCharacter
+        for _, character in ipairs(raycast.livingCharacters(lp.Character)) do
+            local player = Players:GetPlayerFromCharacter(character)
+            local permitted = (player and sa.players) or (not player and sa.npcs)
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local part = character:FindFirstChild(sa.head and "Head" or "HumanoidRootPart")
+            if permitted and humanoid and humanoid.Health > 0 and part and part:IsA("BasePart")
+                and not character:FindFirstChildOfClass("ForceField")
+                and self:enemyFromHit({ Instance = part }) == character then
+                local delta = part.Position - origin
+                local distance = delta.Magnitude
+                if distance > 0.001 and distance <= math.min(reach, sa.range) then
+                    local direction = delta / distance
+                    local inside, screenDistance = sa.circleContains(camera, part.Position)
+                    if inside and screenDistance < bestDistance then
+                        -- The game's raycast enforces region and wall visibility.
+                        local hit = origAim(self, reach, 0, direction)
+                        if hit and self:enemyFromHit(hit) == character then
+                            bestDistance, best = screenDistance, direction
+                            bestCharacter = character
+                        end
+                    end
+                end
+            end
+        end
+        return best, bestCharacter
+    end
+    sa.chooseTarget = function() if ready and ctl:canAct() then return choose(ctl, sa.range) end end
+    if ready then
+        wrappedAim = function(self, reach, spread, direction, ...)
+            if depth > 0 and alive and sa.on and self == ctl and not self.state.knife
+                and not self.menu and not sa.menuOpen then
+                local selected, targetDirection, target = pcall(choose, self, reach)
+                sa.lastError = not selected and tostring(targetDirection) or nil
+                if selected and targetDirection then direction = targetDirection; sa.redirected = (sa.redirected or 0) + 1 end
+            end
+            return origAim(self, reach, spread, direction, ...)
+        end
+        wrappedAttack = function(self, ...)
+            depth += 1
+            local result = table.pack(pcall(origAttack, self, ...))
+            depth -= 1
+            if not result[1] then error(result[2], 0) end
+            return table.unpack(result, 2, result.n)
+        end
+        g(function() ctl.aimHit, ctl.attack = wrappedAim, wrappedAttack end)
+        sa.cleanup = function()
+            sa.on = false
+            g(function()
+                if rawget(ctl, "attack") == wrappedAttack then ctl.attack = priorAttack end
+                if rawget(ctl, "aimHit") == wrappedAim then ctl.aimHit = priorAim end
+            end)
+        end
+    end
+    local controls = card(0, 0.5, "Silent Aim", sa.page)
+    local targets = card(0.5, 0.5, "Targets", sa.page)
+    toggleRow(controls, 48, "Enabled", function() return sa.on end, function(v)
+        sa.on = v and ready and true or false
+        if v and not ready then setStatus("Combat controller unavailable. Re-run after loading into the game.", "bad") end
+    end)
+    slider(controls, 90, "FOV circle radius", 10, 600, 1, function() return sa.radius end, function(v) sa.radius = v end, function(v) return tostring(v) .. " px" end)
+    slider(controls, 156, "Maximum range", 10, 1000, 10, function() return sa.range end, function(v) sa.range = v end, function(v) return tostring(v) .. " studs" end)
+    text(controls, "Enable, then close the menu to use. Applies to your shots; camera and weapon spread stay as the game sets them.", 12, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 90))
+    toggleRow(targets, 48, "Players", function() return sa.players end, function(v) sa.players = v end)
+    toggleRow(targets, 84, "Practice / onboarding targets", function() return sa.npcs end, function(v) sa.npcs = v end)
+    toggleRow(targets, 120, "Aim at head (off = body)", function() return sa.head end, function(v) sa.head = v end)
+    toggleRow(targets, 156, "Show FOV circle", function() return sa.showFov end, function(v) sa.showFov = v end)
+    text(targets, "Camera aiming and smoothing are in Aim Assist. These target filters and the FOV circle are shared.", 12, C.dim, UDim2.fromOffset(14, 200), UDim2.new(1, -28, 0, 90))
+end
+
+do
+    local es = sa.esp
+    es.page = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
+    local options = card(0, 0.5, "Skeleton ESP", es.page)
+    local appearance = card(0.5, 0.5, "Appearance", es.page)
+    toggleRow(options, 48, "Skeleton", function() return es.skeleton end, function(v) es.skeleton = v end)
+    toggleRow(options, 84, "Head dot", function() return es.headDot end, function(v) es.headDot = v end)
+    toggleRow(options, 120, "Hide teammates", function() return es.hideTeam end, function(v) es.hideTeam = v end)
+    toggleRow(options, 156, "Practice targets", function() return es.practice end, function(v) es.practice = v end)
+    slider(appearance, 48, "Line thickness", 1, 4, 0.5, function() return es.thickness end, function(v) es.thickness = v end, function(v) return tostring(v) .. " px" end)
+    slider(appearance, 114, "Head dot radius", 2, 10, 1, function() return es.dotRadius end, function(v) es.dotRadius = v end, function(v) return tostring(v) .. " px" end)
+    text(appearance, "Uses your accent color. Draws over the world, excludes you, and supports R6 and R15 characters.", 12, C.dim, UDim2.fromOffset(14, 190), UDim2.new(1, -28, 0, 90))
+    local overlay = make("ScreenGui", { Name = "PDSkeletonOverlay", IgnoreGuiInset = true, ResetOnSpawn = false, DisplayOrder = 49 }, lp.PlayerGui)
+    es.cleanup = function() overlay:Destroy() end
+    local layer = make("Frame", { Name = "SkeletonESP", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ClipsDescendants = true, Active = false }, overlay)
+    local r6 = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
+    local r15 = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
+    local entries, nextScan = {}, 0
+    local combatRay
+    g(function() combatRay = require(RS.Combat.CombatRaycast) end)
+    local function add(character, owner)
+        if character == lp.Character or entries[character] then return end
+        local group = make("Frame", { Name = character.Name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Active = false }, layer)
+        local entry = { group = group, owner = owner, lines = {} }
+        for i = 1, #r15 do
+            entry.lines[i] = make("Frame", { Name = "Bone" .. i, AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, BackgroundColor3 = C.accent, Active = false, Visible = false }, group)
+        end
+        entry.dot = make("Frame", { Name = "HeadDot", AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, BackgroundColor3 = C.accent, Active = false, Visible = false }, group)
+        make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, entry.dot)
+        entries[character] = entry
+    end
+    local function scan()
+        local present = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= lp and player.Character then present[player.Character] = true; add(player.Character, player) end
+        end
+        if es.practice and combatRay then
+            for _, character in ipairs(combatRay.livingCharacters(lp.Character)) do
+                if character:GetAttribute("PDPracticeTarget") == true then present[character] = true; add(character, nil) end
+            end
+        end
+        for character, entry in pairs(entries) do
+            if not present[character] or not character.Parent then entry.group:Destroy(); entries[character] = nil end
+        end
+    end
+    keep(RunService.RenderStepped:Connect(function()
+
+        layer.Visible = alive and (es.skeleton or es.headDot)
+        if not layer.Visible then return end
+        local camera = workspace.CurrentCamera
+        if not camera then layer.Visible = false; return end
+        if os.clock() >= nextScan then nextScan = os.clock() + 0.5; scan() end
+        for character, entry in pairs(entries) do
+            local hum = character:FindFirstChildOfClass("Humanoid")
+            local owner = entry.owner
+            local sameTeam = owner and lp:GetAttribute("PDMatch") ~= nil and owner:GetAttribute("PDMatch") == lp:GetAttribute("PDMatch") and lp:GetAttribute("PDTeam") ~= nil and owner:GetAttribute("PDTeam") == lp:GetAttribute("PDTeam")
+            entry.group.Visible = character.Parent ~= nil and character ~= lp.Character and hum ~= nil and hum.Health > 0 and not (es.hideTeam and sameTeam) and (owner ~= nil or es.practice)
+            if entry.group.Visible then
+                local bones = character:FindFirstChild("UpperTorso") and r15 or r6
+                for i, line in ipairs(entry.lines) do
+                    line.Visible = false
+                    local bone = bones[i]
+                    local p1 = bone and character:FindFirstChild(bone[1])
+                    local p2 = bone and character:FindFirstChild(bone[2])
+                    if es.skeleton and p1 and p2 and p1:IsA("BasePart") and p2:IsA("BasePart") then
+                        local a = camera:WorldToViewportPoint(p1.Position)
+                        local b = camera:WorldToViewportPoint(p2.Position)
+                        if a.Z > 0.1 and b.Z > 0.1 then
+                            local dx, dy = b.X-a.X, b.Y-a.Y
+                            local length = math.sqrt(dx*dx + dy*dy)
+                            if length > 0.1 then
+                                line.Position = UDim2.fromOffset((a.X+b.X)/2, (a.Y+b.Y)/2)
+                                line.Size = UDim2.fromOffset(length, es.thickness)
+                                line.Rotation = math.deg(math.atan2(dy,dx))
+                                line.BackgroundColor3 = C.accent; line.Visible = true
+                            end
+                        end
+                    end
+                end
+                entry.dot.Visible = false
+                local head = character:FindFirstChild("Head")
+                if es.headDot and head and head:IsA("BasePart") then
+                    local point, onScreen = camera:WorldToViewportPoint(head.Position)
+                    if onScreen and point.Z > 0.1 then
+                        entry.dot.Position = UDim2.fromOffset(point.X, point.Y)
+                        entry.dot.Size = UDim2.fromOffset(es.dotRadius*2, es.dotRadius*2)
+                        entry.dot.BackgroundColor3 = C.accent; entry.dot.Visible = true
+                    end
+                end
+            end
+        end
+    end))
+end
+
+sa.cameraPage = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
+do
+    local controls = card(0, 0.5, "Aim Assist", sa.cameraPage)
+    local info = card(0.5, 0.5, "Camera smoothing", sa.cameraPage)
+    toggleRow(controls, 48, "Enabled", function() return sa.cameraOn end, function(v) sa.cameraOn = v end)
+    toggleRow(controls, 84, "Smooth camera aim", function() return sa.cameraSmooth end, function(v) sa.cameraSmooth = v end)
+    slider(controls, 130, "Response speed", 1, 30, 1, function() return sa.cameraSpeed end, function(v) sa.cameraSpeed = v end, function(v) return tostring(v) end)
+    text(controls, "Hold right mouse to aim. Release to stop. Disabled while the menu or free cursor is open. Starts disabled each run.", 12, C.dim, UDim2.fromOffset(14, 200), UDim2.new(1, -28, 0, 110))
+    text(info, "Lower speed = gentler camera movement. Higher speed = faster tracking.\n\nUses the same circular FOV, range, head/body and target filters as Aim & FOV.\n\nSilent Aim remains a separate option. Aim Assist moves the camera and does not fire for you.", 13, C.text, UDim2.fromOffset(14, 48), UDim2.new(1, -28, 0, 250))
+    function sa.cameraBlend(current, direction, dt)
+        local goal = CFrame.lookAt(current.Position, current.Position + direction)
+        local alpha = sa.cameraSmooth and (1 - math.exp(-sa.cameraSpeed * math.max(0, dt))) or 1
+        return current:Lerp(goal, alpha)
+    end
+    function sa.cameraStep(dt)
+        if not alive or not sa.cameraOn or sa.menuOpen or freeCursor or not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UIS:GetFocusedTextBox() then return end
+        local camera = workspace.CurrentCamera
+        if not camera or camera.CameraType ~= Enum.CameraType.Custom then return end
+        local clean, field = camera.CFrame, camera.FieldOfView
+        -- Select using the same projection the user sees after stretch/FOV effects.
+        if st.on then camera.CFrame = clean * CFrame.new(0,0,0,1,0,0,0,1-math.clamp(st.amount,0,0.7),0,0,0,1) end
+        if vm.on and vm.fov ~= 0 then camera.FieldOfView = math.clamp(field + vm.fov, 1, 120) end
+        local ok, direction = pcall(sa.chooseTarget)
+        camera.CFrame, camera.FieldOfView = clean, field
+        sa.cameraError = not ok and tostring(direction) or nil
+        if ok and direction then
+            camera.CFrame = sa.cameraBlend(clean, direction, dt)
+            sa.cameraUpdates = (sa.cameraUpdates or 0) + 1
+        end
+    end
+end
+
+sa.hub = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
+do
+    local aim, esp, camera = sa.page, sa.esp.page, sa.cameraPage
+    for _, page in ipairs({aim, esp, camera}) do
+        page.Parent = sa.hub
+        page.Position = UDim2.fromOffset(0, 40)
+        page.Size = UDim2.new(1, 0, 1, -40)
+    end
+    aim.Visible, esp.Visible, camera.Visible = false, false, true
+    local aimButton = button(sa.hub, "Aim & FOV", UDim2.fromOffset(0, 0), UDim2.fromOffset(140, 30), true)
+    local espButton = button(sa.hub, "Skeleton ESP", UDim2.fromOffset(150, 0), UDim2.fromOffset(140, 30), false)
+    local cameraButton = button(sa.hub, "Aim Assist", UDim2.fromOffset(300, 0), UDim2.fromOffset(140, 30), false)
+    local function selectPage(page)
+        aim.Visible, esp.Visible, camera.Visible = page == aim, page == esp, page == camera
+        aimButton.BackgroundTransparency = page == aim and 0.1 or 0.8
+        espButton.BackgroundTransparency = page == esp and 0.1 or 0.8
+        cameraButton.BackgroundTransparency = page == camera and 0.1 or 0.8
+    end
+    aimButton.MouseButton1Click:Connect(function() selectPage(aim) end)
+    espButton.MouseButton1Click:Connect(function() selectPage(esp) end)
+    cameraButton.MouseButton1Click:Connect(function() selectPage(camera) end)
+    selectPage(camera)
+end
+
+
 local function defaults()
+    sa.on = false
 	tr.on, tr.color, tr.thick, tr.life, tr.glow, tr.streak, tr.replace = false, "Cyan", 0.12, 0.6, true, false, true
 	spin.on, spin.speed, spin.dir, spin.axis, spin.mode = false, 180, 1, "Y", "Continuous"
 	st.on, st.amount = false, 0.35
 	hud.on, hud.keys, hud.stats = false, true, true
-	sh.on, sh.color, sh.fill, sh.outline, sh.onTop = false, "Cyan", 0.65, 0, true
 	wd.on = false; setPreset("Natural")
 	mb.on, mb.strength, mb.threshold, mb.smooth = false, 12, 120, 0.12
 	vm.on, vm.fov, vm.size, vm.x, vm.y, vm.z = false, 0, 1, 0, 0, 0
@@ -2111,7 +2281,7 @@ end
 
 -- every page was laid out for the old full-width window with tabs on top: move each one right of the menu and up
 -- into the space the tab row used to take
-for _, f in ipairs({ left.frame, right.frame, fxPage, dispPage, worldPage, camPage, boostPage, setFrame, bar }) do
+for _, f in ipairs({ left.frame, right.frame, fxPage, dispPage, worldPage, camPage, boostPage, setFrame, sa.hub, bar }) do
 	local dy = (f == bar) and 0 or 34
 	f.Position += UDim2.fromOffset(SIDE - 4, -dy)
 	f.Size += UDim2.fromOffset(f.Size.X.Scale > 0 and -(SIDE - 4) or 0, dy)
@@ -2120,9 +2290,10 @@ previewPanel.Position += UDim2.fromOffset(0, -34)
 previewPanel.Size += UDim2.fromOffset(0, 34)
 
 local page = "skins"
-local pages = { fx = fxPage, boost = boostPage, display = dispPage, world = worldPage, camera = camPage, settings = setFrame }
+local pages = { aim = sa.hub, fx = fxPage, boost = boostPage, display = dispPage, world = worldPage, camera = camPage, settings = setFrame }
 local tabs = tabBtns
 local PAGE_MSG = {
+    aim = "Silent Aim: enable, then close the menu. FOV is a screen-space circle; its radius is measured in pixels.",
 	skins = "Pick a weapon, click a skin. Only you see the change.",
 	fx = "Tracers and weapon spin. Each one has its own switch.",
 	boost = "More FPS: lower graphics, higher FPS cap, lighter world. Only your own screen changes.",
@@ -2423,13 +2594,12 @@ end
 local function unload()
 	if not alive then return end
 	alive = false
+    pcall(sa.cleanup); pcall(sa.esp.cleanup)
 	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
 	pcall(viewApi.off)
 	pcall(onlineGone)
-	for _, hl in pairs(playerHighlights) do pcall(function() hl:Destroy() end) end
-	table.clear(playerHighlights)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
 	pcall(restoreOpt)   -- graphics quality, FPS cap and every changed map property go back
 	pcall(previewCleanup)
@@ -2456,9 +2626,9 @@ end
 closeBtn.MouseButton1Click:Connect(unload)
 
 _G.PistolDuelsSkinChanger = {
-	unload = unload, sel = sel, pat = pat, wear = wear, hits = function() return hits end, reEquip = reEquip,
+	unload = unload, sa = sa, sel = sel, pat = pat, wear = wear, hits = function() return hits end, reEquip = reEquip,
 	setHideArms = setHideArms, hideArms = function() return hideArms end,
 	setFreeCursor = setFreeCursor, freeCursor = function() return freeCursor end,
-	tr = tr, spin = spin, st = st, hud = hud, sh = sh, wd = wd, mb = mb, vm = vm, opt = opt, applyOpt = applyOpt, tints = tints, ammoFx = ammoFx, showPreview = function(id) showPreview(id) end, ui = ui, fav = fav, loadouts = loadouts, shuffle = shuffle, applyWorld = applyWorld, tracer = spawnTracer,
+	tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb, vm = vm, opt = opt, applyOpt = applyOpt, tints = tints, ammoFx = ammoFx, showPreview = function(id) showPreview(id) end, ui = ui, fav = fav, loadouts = loadouts, shuffle = shuffle, applyWorld = applyWorld, tracer = spawnTracer,
 }
 print(("[SkinChanger] ready: %d weapons, %d skins"):format(#weapons, (function() local n = 0 for _, l in pairs(skinsOf) do n += #l end return n end)()))

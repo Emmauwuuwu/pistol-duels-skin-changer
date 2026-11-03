@@ -1,7 +1,6 @@
-# Meowthjr's legit menu (Pistol Duels)
+# Meowthjr's menu (Pistol Duels)
 
-A local-only cosmetic menu for the Roblox game **Pistol Duels**. Everything it changes is on your own screen only:
-other players, your inventory, trades and purchases are never touched.
+A menu for **Pistol Duels** with local cosmetic options and a **Not So Legit** tab for aim assistance and skeleton ESP. Cosmetic skin changes do not change inventory ownership, trades, or purchases.
 
 Made by meowthjr & Claude.
 
@@ -17,12 +16,20 @@ Made by meowthjr & Claude.
 - **Effects:** bullet tracers on your own shots, and a spin on your own weapon model.
 - **Boost:** more FPS. Lower graphics quality, FPS cap, and optionally no post effects, particles or decals, plus
   plain materials. Everything goes back when you turn it off.
-- **Display:** stretched resolution, a draggable keystrokes / FPS / ping overlay, and a highlight on your own character.
+- **Display:** stretched resolution and a draggable keystrokes / FPS / ping overlay.
 - **World:** color looks, glow and sun rays. They can only darken the map, never brighten it.
 - **Camera:** motion blur on fast turns, field of view, weapon size and position.
 - **Settings:** rebindable hotkeys, window size, accent color.
 - **Auto slide on jump** (Settings): after each jump the slide key is pressed for you just before you land, so you
   land straight into a slide. Hold jump to keep slide-jumping. Only when you're running fast enough to slide.
+
+## Not So Legit
+
+- **Aim Assist:** hold right mouse to move the camera toward an eligible target. Optional camera smoothing has an adjustable response speed; lower values move more gently. Starts disabled.
+- **Aim & FOV:** separate Silent Aim toggle, a screen-space circular FOV with pixel-radius control, range, player/practice-target filters, and head/body selection. Silent Aim starts disabled.
+- **Skeleton ESP:** R6/R15 skeleton lines and round head dots, independent toggles, teammate and practice-target filters, line thickness, and dot radius. Replaces the old highlight ESP.
+
+Aim Assist and Silent Aim share the circular target-selection area. Skeleton ESP and the FOV outline are visual overlays; Silent Aim changes shot direction and Aim Assist changes camera direction.
 
 ## How to use
 
