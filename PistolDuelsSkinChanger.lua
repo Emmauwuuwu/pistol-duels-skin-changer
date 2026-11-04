@@ -156,7 +156,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -191,7 +191,7 @@ pcall(function()
 			for k, v in pairs(type(d.wear) == "table" and d.wear or {}) do if type(v) == "number" then wear[k] = v end end
 			seenHelp = d.seenHelp == true
 			hideArms = d.hideArms == true
-			mergeInto(sa.esp, d.esp); mergeInto(sa, d.sa); sa.on = false; sa.cameraOn = false; mergeInto(tr, d.tr); mergeInto(spin, d.spin); mergeInto(st, d.st); mergeInto(hud, d.hud); mergeInto(wd, d.wd); mergeInto(mb, d.mb)
+			mergeInto(sa.esp, d.esp); mergeInto(sa, d.sa); mergeInto(tr, d.tr); mergeInto(spin, d.spin); mergeInto(st, d.st); mergeInto(hud, d.hud); mergeInto(wd, d.wd); mergeInto(mb, d.mb)
 			mergeInto(vm, d.vm); mergeInto(opt, d.opt); mergeInto(ui, d.ui)
 			for w, v in pairs(type(d.tints) == "table" and d.tints or {}) do
 				if type(v) == "table" then
@@ -215,7 +215,7 @@ end)
 local function save()
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
@@ -2161,6 +2161,7 @@ do
     toggleRow(targets, 84, "Practice / onboarding targets", function() return sa.npcs end, function(v) sa.npcs = v end)
     local modes = {"Head", "Body", "Closest Part", "Weighted Random"}
     local modeButton = button(targets, sa.targetMode, UDim2.fromOffset(14, 120), UDim2.new(1, -28, 0, 28), false)
+    repaints[#repaints+1] = function() modeButton.Text = sa.targetMode end
     modeButton.MouseButton1Click:Connect(function()
         local index = table.find(modes, sa.targetMode) or 1
         sa.targetMode = modes[index % #modes + 1]; modeButton.Text = sa.targetMode; save()
@@ -2275,7 +2276,7 @@ do
     slider(controls, 130, "Response speed", 1, 30, 1, function() return sa.cameraSpeed end, function(v) sa.cameraSpeed = v end, function(v) return tostring(v) end)
     slider(controls, 196, "Aim Assist FOV radius", 10, 600, 1, function() return sa.cameraRadius end, function(v) sa.cameraRadius = v end, function(v) return tostring(v) .. " px" end)
     toggleRow(controls, 254, "Show Aim Assist FOV", function() return sa.cameraShowFov end, function(v) sa.cameraShowFov = v end)
-    text(controls, "Hold right mouse to aim. Release to stop. Disabled while the menu or free cursor is open. Starts disabled each run.", 12, C.dim, UDim2.fromOffset(14, 292), UDim2.new(1, -28, 0, 78))
+    text(controls, "Hold your configured aim input to aim. Release to stop. Disabled while the menu or free cursor is open. Bind inputs in Controls.", 12, C.dim, UDim2.fromOffset(14, 292), UDim2.new(1, -28, 0, 78))
     toggleRow(info, 48, "Aim at head (off = body)", function() return sa.cameraHead end, function(v) sa.cameraHead = v end)
     text(info, "Lower speed = gentler camera movement. Higher speed = faster tracking.\n\nUses its own orange FOV circle. Head/body is selected here, independently of Silent Aim. Range and target filters are shared with Aim & FOV.\n\nSilent Aim remains a separate option. Aim Assist moves the camera and does not fire for you.", 13, C.text, UDim2.fromOffset(14, 92), UDim2.new(1, -28, 0, 270))
     local ring = make("Frame", { Name = "AimAssistFOV", AnchorPoint = Vector2.new(0.5,0.5), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, Visible = false }, gui)
@@ -2295,7 +2296,7 @@ do
         return current:Lerp(goal, alpha)
     end
     function sa.cameraStep(dt)
-        if not alive or not sa.cameraOn or sa.menuOpen or freeCursor or not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UIS:GetFocusedTextBox() then return end
+        if not alive or not sa.cameraOn or sa.menuOpen or freeCursor or not (sa.holdActive and sa.holdActive()) or UIS:GetFocusedTextBox() then return end
         local camera = workspace.CurrentCamera
         if not camera or camera.CameraType ~= Enum.CameraType.Custom then return end
         local clean, field = camera.CFrame, camera.FieldOfView
@@ -2312,10 +2313,78 @@ do
     end
 end
 
+sa.controlsPage = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
+do
+    local actions = {
+        {"silent", "Silent Aim", sa, "on"}, {"camera", "Aim Assist", sa, "cameraOn"},
+        {"smooth", "Camera smoothing", sa, "cameraSmooth"}, {"head", "Aim Assist head / body", sa, "cameraHead"},
+        {"silentFov", "Silent Aim FOV circle", sa, "showFov"}, {"cameraFov", "Aim Assist FOV circle", sa, "cameraShowFov"},
+        {"players", "Target players", sa, "players"}, {"practice", "Target practice NPCs", sa, "npcs"},
+        {"skeleton", "Skeleton ESP", sa.esp, "skeleton"}, {"dots", "ESP head dots", sa.esp, "headDot"},
+        {"team", "ESP teammate filter", sa.esp, "hideTeam"}, {"espPractice", "ESP practice targets", sa.esp, "practice"},
+        {"mode", "Cycle Silent Aim target mode"},
+    }
+    local rows = make("ScrollingFrame", { Name = "Bindings", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1,0,1,-48), Position = UDim2.fromOffset(0,48), CanvasSize = UDim2.fromOffset(0,(#actions+1)*38), ScrollBarThickness = 5 }, sa.controlsPage)
+    text(sa.controlsPage, "Click a binding, then press a key. Esc cancels; Backspace clears. Settings and enabled states save automatically.", 12, C.dim, UDim2.fromOffset(14,0), UDim2.new(1,-28,0,42))
+    local buttons = {}
+    local function paint()
+        for id,b in pairs(buttons) do b.Text = sa.capture == id and "Press a key..." or (id == "hold" and sa.cameraHold or sa.binds[id] or "None") end
+    end
+    local function row(index, id, label)
+        text(rows,label,13,C.text,UDim2.fromOffset(14,index*38+5),UDim2.new(1,-210,0,24))
+        local b=button(rows,"",UDim2.new(1,-184,0,index*38),UDim2.fromOffset(164,28),false)
+        buttons[id]=b
+        b.MouseButton1Click:Connect(function() sa.capture = sa.capture ~= id and id or nil; paint() end)
+    end
+    row(0,"hold","Aim Assist hold input (keyboard / RMB / MMB)")
+    for i,action in ipairs(actions) do row(i,action[1],action[2]) end
+    function sa.holdActive()
+        if sa.capture or binding then return false end
+        if sa.cameraHold == "MouseButton2" or sa.cameraHold == "MouseButton3" then return UIS:IsMouseButtonPressed(Enum.UserInputType[sa.cameraHold]) end
+        local key=keyOf(sa.cameraHold)
+        return key ~= nil and UIS:IsKeyDown(key)
+    end
+    function sa.handleInput(input, processed)
+        if binding then return false end
+        if sa.capture then
+            local key=input.KeyCode
+            if key == Enum.KeyCode.Escape then sa.capture=nil; paint(); return true end
+            local name = input.UserInputType == Enum.UserInputType.Keyboard and key.Name or nil
+            if sa.capture == "hold" and (input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.MouseButton3) then name=input.UserInputType.Name end
+            if not name or name == "Unknown" then return true end
+            if key == Enum.KeyCode.Backspace then name="None" end
+            if name ~= "None" then
+                if name==ui.keyMenu or name==ui.keyCursor or name==ui.keyView then setStatus("That key is already assigned in Settings.","bad"); return true end
+                if sa.capture ~= "hold" and name==sa.cameraHold then setStatus("That key is the Aim Assist hold input.","bad"); return true end
+                for id,value in pairs(sa.binds) do if id~=sa.capture and value==name then setStatus("That key is already assigned in Controls.","bad"); return true end end
+            end
+            if sa.capture=="hold" then sa.cameraHold=name else sa.binds[sa.capture]=name end
+            sa.capture=nil; paint(); save(); return true
+        end
+        if processed or UIS:GetFocusedTextBox() or input.UserInputType~=Enum.UserInputType.Keyboard then return false end
+        local name=input.KeyCode.Name
+        -- Global menu bindings always take priority if changed later.
+        if name==ui.keyMenu or name==ui.keyCursor or name==ui.keyView then return false end
+        for _,action in ipairs(actions) do
+            if sa.binds[action[1]]==name then
+                if action[1]=="mode" then
+                    local modes={"Head","Body","Closest Part","Weighted Random"}
+                    sa.targetMode=modes[(table.find(modes,sa.targetMode) or 1)%#modes+1]
+                else action[3][action[4]]=not action[3][action[4]] end
+                for _,repaint in ipairs(repaints) do repaint() end
+                save(); return true
+            end
+        end
+        return false
+    end
+    paint()
+    repaints[#repaints+1]=paint
+end
+
 sa.hub = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 do
-    local aim, esp, camera = sa.page, sa.esp.page, sa.cameraPage
-    for _, page in ipairs({aim, esp, camera}) do
+    local aim, esp, camera, controls = sa.page, sa.esp.page, sa.cameraPage, sa.controlsPage
+    for _, page in ipairs({aim, esp, camera, controls}) do
         page.Parent = sa.hub
         page.Position = UDim2.fromOffset(0, 40)
         page.Size = UDim2.new(1, 0, 1, -40)
@@ -2324,15 +2393,20 @@ do
     local aimButton = button(sa.hub, "Aim & FOV", UDim2.fromOffset(0, 0), UDim2.fromOffset(140, 30), true)
     local espButton = button(sa.hub, "Skeleton ESP", UDim2.fromOffset(150, 0), UDim2.fromOffset(140, 30), false)
     local cameraButton = button(sa.hub, "Aim Assist", UDim2.fromOffset(300, 0), UDim2.fromOffset(140, 30), false)
+    local controlsButton = button(sa.hub, "Controls", UDim2.fromOffset(450, 0), UDim2.fromOffset(120, 30), false)
     local function selectPage(page)
         aim.Visible, esp.Visible, camera.Visible = page == aim, page == esp, page == camera
+        controls.Visible = page == controls
+        sa.capture = nil
         aimButton.BackgroundTransparency = page == aim and 0.1 or 0.8
         espButton.BackgroundTransparency = page == esp and 0.1 or 0.8
         cameraButton.BackgroundTransparency = page == camera and 0.1 or 0.8
+        controlsButton.BackgroundTransparency = page == controls and 0.1 or 0.8
     end
     aimButton.MouseButton1Click:Connect(function() selectPage(aim) end)
     espButton.MouseButton1Click:Connect(function() selectPage(esp) end)
     cameraButton.MouseButton1Click:Connect(function() selectPage(camera) end)
+    controlsButton.MouseButton1Click:Connect(function() selectPage(controls) end)
     selectPage(camera)
 end
 
@@ -2439,6 +2513,7 @@ gotIt.MouseButton1Click:Connect(function() showHelp(false); seenHelp = true; sav
 
 hideBtn.MouseButton1Click:Connect(function() setOpen(false) end)
 keep(UIS.InputBegan:Connect(function(i, gp)
+    if sa.handleInput and sa.handleInput(i, gp) then return end
 	if binding then   -- the Settings tab is waiting for a new hotkey
 		if i.UserInputType == Enum.UserInputType.Keyboard then
 			if i.KeyCode ~= Enum.KeyCode.Escape then ui[binding] = i.KeyCode.Name; save() end
