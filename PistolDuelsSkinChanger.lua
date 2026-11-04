@@ -152,7 +152,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -211,13 +211,13 @@ end)
 local function save()
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
 end
 
-sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000)
+for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000)
 local function keyOf(name)
 	local ok, k = pcall(function() return Enum.KeyCode[name] end)
 	return ok and k or nil
@@ -2042,17 +2042,48 @@ do
         if targetHead then return character:FindFirstChild("Head") end
         return character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
     end
-    local function choose(self, reach, radius, targetHead)
+    local partGroups = {
+        Head = {"Head"},
+        Body = {"UpperTorso", "LowerTorso", "Torso"},
+        Limbs = {"LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
+    }
+    function sa.rollGroup(available, roll)
+        local weights = {Head = sa.headWeight, Body = sa.bodyWeight, Limbs = sa.limbWeight}
+        local total = 0
+        for _, group in ipairs({"Head", "Body", "Limbs"}) do if available[group] then total += weights[group] end end
+        if total <= 0 then return nil end
+        local threshold = math.clamp(roll, 0, 0.999999999) * total
+        for _, group in ipairs({"Head", "Body", "Limbs"}) do
+            if available[group] then
+                threshold -= weights[group]
+                if threshold < 0 then return group end
+            end
+        end
+    end
+    local function choose(self, reach, radius, targetHead, mode)
         local camera = workspace.CurrentCamera
         if not camera or not lp.Character then return end
         local origin = camera.CFrame.Position
         local bestDistance = math.huge
         local best, bestCharacter
+        local groups = {}
         for _, character in ipairs(raycast.livingCharacters(lp.Character)) do
             local player = Players:GetPlayerFromCharacter(character)
             local permitted = (player and sa.players) or (not player and sa.npcs)
             local humanoid = character:FindFirstChildOfClass("Humanoid")
-            local part = sa.targetPart(character, targetHead)
+            local candidates = {}
+            if mode == "Closest Part" or mode == "Weighted Random" then
+                for group, names in pairs(partGroups) do
+                    for _, name in ipairs(names) do
+                        local p = character:FindFirstChild(name)
+                        if p then candidates[#candidates+1] = {part=p, group=group} end
+                    end
+                end
+            else
+                candidates[1] = {part=sa.targetPart(character, mode == "Head" or (mode == nil and targetHead)), group=targetHead and "Head" or "Body"}
+            end
+            for _, candidate in ipairs(candidates) do
+            local part = candidate.part
             if permitted and humanoid and humanoid.Health > 0 and part and part:IsA("BasePart")
                 and not character:FindFirstChildOfClass("ForceField")
                 and self:enemyFromHit({ Instance = part }) == character then
@@ -2061,16 +2092,28 @@ do
                 if distance > 0.001 and distance <= math.min(reach, sa.range) then
                     local direction = delta / distance
                     local inside, screenDistance = sa.circleContains(camera, part.Position, radius)
-                    if inside and screenDistance < bestDistance then
+                    if inside and (screenDistance < bestDistance or mode == "Weighted Random") then
                         -- The game's raycast enforces region and wall visibility.
                         local hit = origAim(self, reach, 0, direction)
                         if hit and self:enemyFromHit(hit) == character then
-                            bestDistance, best = screenDistance, direction
-                            bestCharacter = character
+                            if screenDistance < bestDistance then
+                                bestDistance, best = screenDistance, direction
+                                bestCharacter = character
+                            end
+                            local previous = groups[candidate.group]
+                            if not previous or screenDistance < previous.distance then
+                                groups[candidate.group] = {distance=screenDistance, direction=direction, character=character}
+                            end
                         end
                     end
                 end
             end
+            end
+        end
+        if mode == "Weighted Random" then
+            local group = sa.rollGroup(groups, math.random())
+            local picked = group and groups[group]
+            return picked and picked.direction, picked and picked.character
         end
         return best, bestCharacter
     end
@@ -2079,7 +2122,7 @@ do
         wrappedAim = function(self, reach, spread, direction, ...)
             if depth > 0 and alive and sa.on and self == ctl and not self.state.knife
                 and not self.menu and not sa.menuOpen then
-                local selected, targetDirection, target = pcall(choose, self, reach, sa.radius, sa.head)
+                local selected, targetDirection, target = pcall(choose, self, reach, sa.radius, sa.head, sa.targetMode)
                 sa.lastError = not selected and tostring(targetDirection) or nil
                 if selected and targetDirection then direction = targetDirection; sa.redirected = (sa.redirected or 0) + 1 end
             end
@@ -2112,9 +2155,17 @@ do
     text(controls, "Enable, then close the menu to use. Applies to your shots; camera and weapon spread stay as the game sets them.", 12, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 90))
     toggleRow(targets, 48, "Players", function() return sa.players end, function(v) sa.players = v end)
     toggleRow(targets, 84, "Practice / onboarding targets", function() return sa.npcs end, function(v) sa.npcs = v end)
-    toggleRow(targets, 120, "Aim at head (off = body)", function() return sa.head end, function(v) sa.head = v end)
+    local modes = {"Head", "Body", "Closest Part", "Weighted Random"}
+    local modeButton = button(targets, sa.targetMode, UDim2.fromOffset(14, 120), UDim2.new(1, -28, 0, 28), false)
+    modeButton.MouseButton1Click:Connect(function()
+        local index = table.find(modes, sa.targetMode) or 1
+        sa.targetMode = modes[index % #modes + 1]; modeButton.Text = sa.targetMode; save()
+    end)
     toggleRow(targets, 156, "Show FOV circle", function() return sa.showFov end, function(v) sa.showFov = v end)
-    text(targets, "Camera aiming and smoothing are in Aim Assist. Target filters are shared; the two FOV radii are independent.", 12, C.dim, UDim2.fromOffset(14, 200), UDim2.new(1, -28, 0, 90))
+    slider(targets, 200, "Random: head weight", 0, 100, 1, function() return sa.headWeight end, function(v) sa.headWeight = v end, tostring)
+    slider(targets, 250, "Random: torso weight", 0, 100, 1, function() return sa.bodyWeight end, function(v) sa.bodyWeight = v end, tostring)
+    slider(targets, 300, "Random: limbs weight", 0, 100, 1, function() return sa.limbWeight end, function(v) sa.limbWeight = v end, tostring)
+    text(targets, "Weights are relative; unavailable groups are excluded. All zero = no redirection.", 11, C.dim, UDim2.fromOffset(14, 345), UDim2.new(1, -28, 0, 40))
 end
 
 do
