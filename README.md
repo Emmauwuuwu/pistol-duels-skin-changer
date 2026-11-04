@@ -29,7 +29,7 @@ Made by meowthjr & Claude.
 - **Aim & FOV:** separate Silent Aim toggle, a screen-space circular FOV with pixel-radius control, range, player/practice-target filters, and head/body selection. Silent Aim starts disabled.
 - **Skeleton ESP:** R6/R15 skeleton lines and round head dots, independent toggles, teammate and practice-target filters, line thickness, and dot radius. Replaces the old highlight ESP.
 
-Aim Assist and Silent Aim share the circular target-selection area. Skeleton ESP and the FOV outline are visual overlays; Silent Aim changes shot direction and Aim Assist changes camera direction.
+Aim Assist and Silent Aim have independent circular FOV radii and visibility toggles. Aim Assist uses an orange outline; Silent Aim uses the menu accent color. Skeleton ESP and the FOV outline are visual overlays; Silent Aim changes shot direction and Aim Assist changes camera direction.
 
 ## How to use
 
