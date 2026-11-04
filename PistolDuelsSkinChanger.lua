@@ -152,7 +152,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -211,7 +211,7 @@ end)
 local function save()
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
@@ -2038,7 +2038,11 @@ do
         priorAttack, priorAim = rawget(ctl, "attack"), rawget(ctl, "aimHit")
     end)
     local ready = ok and ctl and origAttack and origAim and raycast
-    local function choose(self, reach, radius)
+    function sa.targetPart(character, targetHead)
+        if targetHead then return character:FindFirstChild("Head") end
+        return character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+    end
+    local function choose(self, reach, radius, targetHead)
         local camera = workspace.CurrentCamera
         if not camera or not lp.Character then return end
         local origin = camera.CFrame.Position
@@ -2048,7 +2052,7 @@ do
             local player = Players:GetPlayerFromCharacter(character)
             local permitted = (player and sa.players) or (not player and sa.npcs)
             local humanoid = character:FindFirstChildOfClass("Humanoid")
-            local part = character:FindFirstChild(sa.head and "Head" or "HumanoidRootPart")
+            local part = sa.targetPart(character, targetHead)
             if permitted and humanoid and humanoid.Health > 0 and part and part:IsA("BasePart")
                 and not character:FindFirstChildOfClass("ForceField")
                 and self:enemyFromHit({ Instance = part }) == character then
@@ -2070,12 +2074,12 @@ do
         end
         return best, bestCharacter
     end
-    sa.chooseTarget = function(radius) if ready and ctl:canAct() then return choose(ctl, sa.range, radius) end end
+    sa.chooseTarget = function(radius, targetHead) if ready and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
     if ready then
         wrappedAim = function(self, reach, spread, direction, ...)
             if depth > 0 and alive and sa.on and self == ctl and not self.state.knife
                 and not self.menu and not sa.menuOpen then
-                local selected, targetDirection, target = pcall(choose, self, reach, sa.radius)
+                local selected, targetDirection, target = pcall(choose, self, reach, sa.radius, sa.head)
                 sa.lastError = not selected and tostring(targetDirection) or nil
                 if selected and targetDirection then direction = targetDirection; sa.redirected = (sa.redirected or 0) + 1 end
             end
@@ -2217,7 +2221,8 @@ do
     slider(controls, 196, "Aim Assist FOV radius", 10, 600, 1, function() return sa.cameraRadius end, function(v) sa.cameraRadius = v end, function(v) return tostring(v) .. " px" end)
     toggleRow(controls, 254, "Show Aim Assist FOV", function() return sa.cameraShowFov end, function(v) sa.cameraShowFov = v end)
     text(controls, "Hold right mouse to aim. Release to stop. Disabled while the menu or free cursor is open. Starts disabled each run.", 12, C.dim, UDim2.fromOffset(14, 292), UDim2.new(1, -28, 0, 78))
-    text(info, "Lower speed = gentler camera movement. Higher speed = faster tracking.\n\nUses its own orange FOV circle. Range, head/body and target filters are shared with Aim & FOV.\n\nSilent Aim remains a separate option. Aim Assist moves the camera and does not fire for you.", 13, C.text, UDim2.fromOffset(14, 48), UDim2.new(1, -28, 0, 250))
+    toggleRow(info, 48, "Aim at head (off = body)", function() return sa.cameraHead end, function(v) sa.cameraHead = v end)
+    text(info, "Lower speed = gentler camera movement. Higher speed = faster tracking.\n\nUses its own orange FOV circle. Head/body is selected here, independently of Silent Aim. Range and target filters are shared with Aim & FOV.\n\nSilent Aim remains a separate option. Aim Assist moves the camera and does not fire for you.", 13, C.text, UDim2.fromOffset(14, 92), UDim2.new(1, -28, 0, 270))
     local ring = make("Frame", { Name = "AimAssistFOV", AnchorPoint = Vector2.new(0.5,0.5), BackgroundTransparency = 1, BorderSizePixel = 0, Active = false, Visible = false }, gui)
     make("UICorner", { CornerRadius = UDim.new(0.5,0) }, ring)
     make("UIStroke", { Color = Color3.fromRGB(255,170,65), Thickness = 1.5, Transparency = 0.15, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ring)
@@ -2242,7 +2247,7 @@ do
         -- Select using the same projection the user sees after stretch/FOV effects.
         if st.on then camera.CFrame = clean * CFrame.new(0,0,0,1,0,0,0,1-math.clamp(st.amount,0,0.7),0,0,0,1) end
         if vm.on and vm.fov ~= 0 then camera.FieldOfView = math.clamp(field + vm.fov, 1, 120) end
-        local ok, direction = pcall(sa.chooseTarget, sa.cameraRadius)
+        local ok, direction = pcall(sa.chooseTarget, sa.cameraRadius, sa.cameraHead)
         camera.CFrame, camera.FieldOfView = clean, field
         sa.cameraError = not ok and tostring(direction) or nil
         if ok and direction then
