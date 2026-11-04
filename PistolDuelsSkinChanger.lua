@@ -32,6 +32,10 @@ local RS = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer
+local function requireGame(module: Instance): any
+    assert(module:IsA("ModuleScript"), "Expected a game ModuleScript")
+    return require(module)
+end
 
 local SAVE_FILE = "pistol_duels_skin_changer.json"
 local alive = true
@@ -108,10 +112,10 @@ end
 -- the game's modules can only be required from a thread with identity 2 (executors run at 8), so anything that
 -- touches them goes through g(): it runs the function in such a thread, waits for it, and returns pcall's results
 local setIdentity = (type(setthreadidentity) == "function" and setthreadidentity)
-	or (type(set_thread_identity) == "function" and set_thread_identity)
-	or (type(setidentity) == "function" and setidentity)
+	or (type(rawget(getfenv(), "set_thread_identity")) == "function" and rawget(getfenv(), "set_thread_identity"))
+	or (type(rawget(getfenv(), "setidentity")) == "function" and rawget(getfenv(), "setidentity"))
 	or (type(setthreadcontext) == "function" and setthreadcontext)
-	or (type(syn) == "table" and type(syn.set_thread_identity) == "function" and syn.set_thread_identity)
+	or (type(syn) == "table" and type(rawget(syn, "set_thread_identity")) == "function" and rawget(syn, "set_thread_identity"))
 	or nil
 local function g(fn, ...)
 	local args, res, done = table.pack(...), nil, false
@@ -130,13 +134,13 @@ local SkinCatalog, WM, FC, CE
 g(function()
 	local cos = RS:FindFirstChild("Cosmetics")
 	if not cos then return end
-	SkinCatalog = require(cos.SkinCatalog)
-	WM = require(cos.WeaponModel)
+	SkinCatalog = requireGame(cos.SkinCatalog)
+	WM = requireGame(cos.WeaponModel)
 	pcall(function()
-		FC = require(lp.PlayerScripts.Client.Cosmetics.FinishClient)
+		FC = requireGame(lp.PlayerScripts.Client.Cosmetics.FinishClient)
 	end)
 	pcall(function()
-		CE = require(lp.PlayerScripts.Client.Effects.CosmeticEffects)
+		CE = requireGame(lp.PlayerScripts.Client.Effects.CosmeticEffects)
 	end)
 end)
 if not (SkinCatalog and WM) then
@@ -152,7 +156,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { esp = { skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -563,7 +567,7 @@ end
 -- and nothing else. Other players keep seeing your real FX.
 do
 local FXC
-g(function() FXC = require(RS.Cosmetics.AmmoFXCatalog) end)
+g(function() FXC = requireGame(RS.Cosmetics.AmmoFXCatalog) end)
 fxApi.color = function(id) return FXC and FXC.color(id) end
 fxApi.prism = FXC and FXC.Prism
 local FX_ORDER = { "Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Pink", "White", "Black", "Prism", "Bloxxed" }
@@ -1411,7 +1415,7 @@ do
 		hint.Text = ""
 		if not w then return end
 		local ok, m = g(function() return WM.create(w, false, skinId) end)
-		if not (ok and typeof(m) == "Instance") then hint.Text = "No preview for this one"; return end
+		if not (ok and typeof(m) == "Instance" and m:IsA("Model")) then hint.Text = "No preview for this one"; return end
 		for _, d in ipairs(m:GetDescendants()) do
 			if d:IsA("BasePart") then d.Anchored = true; d.CanCollide = false; d.CanQuery = false; d.CanTouch = false end
 		end
@@ -1670,7 +1674,7 @@ do
 			if acc >= 0.5 then
 				local fps = math.floor(frames / acc + 0.5)
 				acc, frames = 0, 0
-				local ok, ms = pcall(function() return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() end)
+				local ok, ms = pcall(function() return (assert(assert(assert(game:GetService("Stats"):FindFirstChild("Network")):FindFirstChild("ServerStatsItem")):FindFirstChild("Data Ping")) :: StatsItem):GetValue() end)
 				hudStats.Text = fps .. " FPS  ·  " .. (ok and math.floor(ms + 0.5) or 0) .. " ms"
 			end
 		end
@@ -1951,7 +1955,7 @@ if opt.on then applyOpt() end
 
 -- Settings page: hotkeys, window size, accent color
 local setFrame, binding, paintKeys, applyAccent   -- binding: "keyMenu" / "keyCursor" / "keyView" while waiting for a new key
-local viewApi = {}   -- third-person view: cycle(), off() (set further down)
+local viewApi: {cycle: (() -> ())?, off: (() -> ())?} = {}   -- third-person view: cycle(), off() (set further down)
 do
 setFrame = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 local hkCard = card(0, 0.5, "Hotkeys", setFrame)
@@ -2025,7 +2029,7 @@ do
     local depth = 0
     local raycast
     local ok = g(function()
-        raycast = require(RS.Combat.CombatRaycast)
+        raycast = requireGame(RS.Combat.CombatRaycast)
         if type(filtergc) == "function" then
             ctl = filtergc("table", { Keys = { "duels", "state", "movement" } }, true)
         elseif type(getgc) == "function" then
@@ -2122,7 +2126,7 @@ do
         wrappedAim = function(self, reach, spread, direction, ...)
             if depth > 0 and alive and sa.on and self == ctl and not self.state.knife
                 and not self.menu and not sa.menuOpen then
-                local selected, targetDirection, target = pcall(choose, self, reach, sa.radius, sa.head, sa.targetMode)
+                local selected, targetDirection = pcall(choose, self, reach, sa.radius, sa.head, sa.targetMode)
                 sa.lastError = not selected and tostring(targetDirection) or nil
                 if selected and targetDirection then direction = targetDirection; sa.redirected = (sa.redirected or 0) + 1 end
             end
@@ -2187,7 +2191,7 @@ do
     local r15 = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
     local entries, nextScan = {}, 0
     local combatRay
-    g(function() combatRay = require(RS.Combat.CombatRaycast) end)
+    g(function() combatRay = requireGame(RS.Combat.CombatRaycast) end)
     local function add(character, owner)
         if character == lp.Character or entries[character] then return end
         local group = make("Frame", { Name = character.Name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Active = false }, layer)
@@ -2469,7 +2473,7 @@ end
 do
 	local VIM = game:GetService("VirtualInputManager")
 	local MoveCfg
-	g(function() MoveCfg = require(RS.Combat.Config) end)
+	g(function() MoveCfg = requireGame(RS.Combat.Config) end)
 	local BUFFER = MoveCfg and MoveCfg.Slide and tonumber(MoveCfg.Slide.LandingBuffer) or 0.15
 	local LEAD = math.clamp(BUFFER * 0.5, 0.03, 0.12)   -- press this long before touching down
 	local function fastEnough(hum, root)
@@ -2667,7 +2671,7 @@ local function unload()
 	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
-	pcall(viewApi.off)
+	if viewApi.off then pcall(viewApi.off) end
 	pcall(onlineGone)
 	pcall(function() if mbBlur then mbBlur:Destroy() end end)
 	pcall(restoreOpt)   -- graphics quality, FPS cap and every changed map property go back
