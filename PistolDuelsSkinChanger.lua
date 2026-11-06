@@ -2303,7 +2303,8 @@ do
         -- Select using the same projection the user sees after stretch/FOV effects.
         if st.on then camera.CFrame = clean * CFrame.new(0,0,0,1,0,0,0,1-math.clamp(st.amount,0,0.7),0,0,0,1) end
         if vm.on and vm.fov ~= 0 then camera.FieldOfView = math.clamp(field + vm.fov, 1, 120) end
-        local ok, direction = pcall(sa.chooseTarget, sa.cameraRadius, sa.cameraHead)
+        -- Potassium requires game-thread identity for the combat visibility check.
+        local ok, direction = g(sa.chooseTarget, sa.cameraRadius, sa.cameraHead)
         camera.CFrame, camera.FieldOfView = clean, field
         sa.cameraError = not ok and tostring(direction) or nil
         if ok and direction then
