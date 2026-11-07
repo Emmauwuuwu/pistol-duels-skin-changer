@@ -46,11 +46,12 @@ again replaces the old copy cleanly, and the × button undoes everything it chan
 
 ## Privacy
 
-While the script runs, it sends an anonymous ping every 30 seconds so the author can see how many people are using
-it. The ping holds only a random id made up for that run, a random id the script keeps in your executor's workspace
+While the script runs, it sends a ping every 30 seconds so the author can see how many people are using
+it. By default the ping holds a random id made up for that run, a random id the script keeps in your executor's workspace
 (`pistol_duels_online_id.txt`, so switching servers doesn't count you twice; delete the file to get a new one), and the
-number of the server you're in (as shown in the game's server list, with its region): no username, no device ID, and
-nothing from your computer.
+number of the server you're in (as shown in the game's server list, with its region).
+Set `_G.PistolDuelsShareUsername = true` before running either script to include your Roblox username in online pings.
+The username is intended for display on the public online counter.
 
 ## Note
 
