@@ -44,7 +44,7 @@ local function keep(c) conns[#conns + 1] = c; return c end
 
 -- online counter: while the script runs it pings the counter every 30 seconds with a random id made up for
 -- this run, a random id kept on this PC (so switching servers doesn't count you twice) and the number of the server
--- you're in (SERVER #n in the game's server list) with its region. Set _G.PistolDuelsShareUsername = true before running to share your Roblox username. The
+-- you're in (SERVER #n in the game's server list) with its region. Active pings also share your Roblox username on the public counter. The
 -- counts show on the counter's page.
 local onlineGone = function() end
 do
@@ -89,7 +89,7 @@ do
 		local function ping(gone)
 			pcall(send, {
 				Url = ONLINE_URL .. "/ping", Method = "POST", Headers = { ["Content-Type"] = "application/json" },
-				Body = HttpService:JSONEncode({ id = runId, user = userId, gone = gone or nil, server = server, region = region, username = (not gone and _G.PistolDuelsShareUsername == true) and lp.Name or nil }),
+				Body = HttpService:JSONEncode({ id = runId, user = userId, gone = gone or nil, server = server, region = region, username = not gone and lp.Name or nil }),
 			})
 		end
 		task.spawn(function()
