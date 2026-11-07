@@ -42,6 +42,7 @@ local function keep(c) conns[#conns + 1] = c; return c end
 -- you're in (SERVER #n in the game's server list) with its region. Active pings also share your Roblox username on the public counter. The
 -- counts show on the counter's page.
 local onlineGone = function() end
+local serverHop
 do
 	local ONLINE_URL = "https://pd-online.meowthjr.workers.dev"   -- the counter's address, empty = off
 	local ID_FILE = "pistol_duels_online_id.txt"
@@ -59,6 +60,7 @@ do
 		-- the server number comes from the game's own server list (what its server browser asks for every 10 s while
 		-- it's open): asked once at the start and every 10 minutes, and also read whenever the browser gets a list
 		local server, region, lobby
+		local serverList, listVersion = {}, 0
 		local function askServer()
 			if not lobby and type(getgc) == "function" then
 				for _, v in ipairs(getgc(true)) do
@@ -71,7 +73,9 @@ do
 				if lobby then
 					keep(lobby.OnClientEvent:Connect(function(msg)
 						if type(msg) ~= "table" or msg.kind ~= "Servers" or type(msg.servers) ~= "table" then return end
-						for _, s in ipairs(msg.servers) do
+						serverList = msg.servers
+						listVersion += 1
+						for _, s in ipairs(serverList) do
 							if type(s) == "table" and (s.current == true or s.id == game.JobId) then
 								server, region = tonumber(s.number), type(s.region) == "string" and s.region or nil
 							end
@@ -80,6 +84,23 @@ do
 				end
 			end
 			if lobby then pcall(function() lobby:FireServer({ kind = "Servers" }) end) end
+		end
+		serverHop = function(number)
+			local version = listVersion
+			askServer()
+			if not lobby then return "Server list unavailable." end
+			local deadline = os.clock() + 5
+			while alive and version == listVersion and os.clock() < deadline do task.wait(0.1) end
+			if not alive or version == listVersion then return "Server list did not respond." end
+			for _, entry in ipairs(serverList) do
+				if type(entry) == "table" and tonumber(entry.number) == number then
+					if entry.current or entry.id == game.JobId then return "Already in that server." end
+					if type(entry.id) ~= "string" or entry.id == "" then return "Server cannot be joined." end
+					game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, entry.id, lp)
+					return "Joining server #" .. number .. "..."
+				end
+			end
+			return "Server #" .. number .. " was not found."
 		end
 		local function ping(gone)
 			pcall(send, {
@@ -171,7 +192,7 @@ local function tintOf(w)
 	if not tints[w] then tints[w] = { on = false, color = "Cyan", strength = 0.45 } end
 	return tints[w]
 end
-local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl", keyView = "X", slideJump = false }   -- window size, accent, hotkeys, auto slide on jump (Settings tab)
+local ui = { scale = 1, accent = "Blue", keyMenu = "RightShift", keyCursor = "RightControl", keyView = "X", slideJump = false, autoLoad = false }   -- window size, accent, hotkeys, auto slide on jump (Settings tab)
 local shuffle = { on = false }   -- random skin each time you equip (Skins tab)
 local fav = {}        -- skin id -> true (starred skins sort first)
 local loadouts = {}   -- "1".."3" -> { sel = {}, pat = {}, wear = {} }
@@ -2095,6 +2116,37 @@ for i, a in ipairs(ACCENTS) do
 	end)
 end
 text(uiCard, "The window resizes when you let go of the slider. The overlay keeps its own size.", 12, C.dim, UDim2.fromOffset(14, 150), UDim2.new(1, -28, 0, 44))
+do
+	local queue = queue_on_teleport or queueonteleport or (type(syn) == "table" and syn.queue_on_teleport)
+	local status = text(uiCard, "", 12, C.dim, UDim2.fromOffset(14, 283), UDim2.new(1, -28, 0, 38))
+	if type(queue) == "function" then
+		toggleRow(uiCard, 215, "Auto load on server change", function() return ui.autoLoad end, function(v) ui.autoLoad = v end)
+		keep(lp.OnTeleport:Connect(function(state, placeId)
+			if state ~= Enum.TeleportState.InProgress or not ui.autoLoad or placeId ~= game.PlaceId then return end
+			pcall(queue, string.format("if not game:IsLoaded() then game.Loaded:Wait() end; if game.PlaceId == %d then loadstring(game:HttpGet(%q))() end", placeId, "https://pd-online.meowthjr.workers.dev/pdtest"))
+		end))
+	else
+		text(uiCard, "Auto load unavailable in this executor", 12, C.dim, UDim2.fromOffset(14, 215), UDim2.new(1, -28, 0, 24))
+	end
+	local numberBox = make("TextBox", {
+		PlaceholderText = "Server #", Text = "", ClearTextOnFocus = false,
+		Position = UDim2.fromOffset(14, 249), Size = UDim2.fromOffset(84, 28),
+		TextColor3 = C.text, BackgroundColor3 = C.bg, TextSize = 13,
+	}, uiCard)
+	local join = button(uiCard, "Join server", UDim2.fromOffset(106, 249), UDim2.fromOffset(96, 28))
+	local busy = false
+	keep(join.MouseButton1Click:Connect(function()
+		if busy then return end
+		local number = tonumber(numberBox.Text:match("^%s*#?(%d+)%s*$"))
+		if not number or number < 1 then status.Text = "Enter a server number."; return end
+		if not serverHop then status.Text = "Server hopping is unavailable."; return end
+		busy = true
+		status.Text = "Looking up server..."
+		local ok, message = pcall(serverHop, number)
+		status.Text = ok and message or "Could not join that server."
+		busy = false
+	end))
+end
 
 text(uiCard, "SHARED SKINS", 11, C.dim, UDim2.fromOffset(14, 206), UDim2.new(1, -28, 0, 14), nil, Enum.Font.BuilderSansMedium)
 toggleRow(uiCard, 226, "See others' skins", function() return share.see end, function(v) share.see = v; save() end)
