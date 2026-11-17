@@ -2078,9 +2078,11 @@ do
         ring.Size = UDim2.fromOffset(width, height)
     end))
     local ctl, origAttack, origAim, wrappedAttack, priorAttack
-    local raycast
+    local raycast, combatConfig, shotSpread
     local ok = g(function()
         raycast = requireGame(RS.Combat.CombatRaycast)
+        combatConfig = requireGame(RS.Combat.Config)
+        shotSpread = requireGame(RS.Combat.ShotSpread)
         if type(filtergc) == "function" then
             ctl = filtergc("table", { Keys = { "duels", "state", "movement" } }, true)
         elseif type(getgc) == "function" then
@@ -2118,6 +2120,7 @@ do
     local function choose(self, reach, radius, targetHead, mode)
         local camera = workspace.CurrentCamera
         if not camera or not lp.Character then return end
+        reach = math.min(reach, combatConfig.Prototype.GunReach)
         local origin = camera.CFrame.Position
         local bestDistance = math.huge
         local best, bestCharacter
@@ -2173,13 +2176,34 @@ do
         return best, bestCharacter
     end
     sa.chooseTarget = function(radius, targetHead) if ready and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
+    -- Invert the game's deterministic spread using the same seed and shot index.
+    function sa.compensateSpread(direction, angle, rollX, rollY)
+        local aim = direction
+        for _ = 1, 4 do
+            local actual = shotSpread.apply(aim, angle, rollX, rollY)
+            aim = (aim + direction - actual).Unit
+        end
+        return aim
+    end
+    local function shotDirection(self)
+        local direction = choose(self, sa.range, sa.radius, sa.head, sa.targetMode)
+        if not direction then return end
+        local state = self.state
+        local humanoid = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+        local movement = humanoid and humanoid:GetState()
+        local airborne = movement == Enum.HumanoidStateType.Jumping or movement == Enum.HumanoidStateType.Freefall
+        local aimAmount = math.round(math.clamp(self.aimAmount or 0, 0, 1) * 255) / 255
+        local angle = shotSpread.angle(combatConfig.Weapons[state.preset], aimAmount, airborne and combatConfig.AirSpread or nil)
+        local rollX, rollY = shotSpread.roll(state.spreadSeed, self:spreadIndex(state))
+        return sa.compensateSpread(direction, angle, rollX, rollY)
+    end
     if ready then
         wrappedAttack = function(self, ...)
             local camera = workspace.CurrentCamera
             local originalFrame, aimedFrame
             if alive and sa.on and self == ctl and camera and not self.state.knife
                 and not self.menu and not sa.menuOpen then
-                local selected, direction = pcall(choose, self, sa.range, sa.radius, sa.head, sa.targetMode)
+                local selected, direction = pcall(shotDirection, self)
                 sa.lastError = not selected and tostring(direction) or nil
                 if selected and direction then
                     -- The game reads both aimLook and hit direction during attack.
@@ -2214,7 +2238,7 @@ do
     end)
     slider(controls, 90, "FOV circle radius", 10, 600, 1, function() return sa.radius end, function(v) sa.radius = v end, function(v) return tostring(v) .. " px" end)
     slider(controls, 156, "Maximum range", 10, 1000, 10, function() return sa.range end, function(v) sa.range = v end, function(v) return tostring(v) .. " studs" end)
-    text(controls, "Enable, then close the menu to use. Applies to your shots; camera and weapon spread stay as the game sets them.", 12, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 90))
+    text(controls, "Enable, then close the menu to use. Compensates weapon spread. Target distance is capped by the game's gun range.", 12, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 90))
     toggleRow(targets, 48, "Players", function() return sa.players end, function(v) sa.players = v end)
     toggleRow(targets, 84, "Practice / onboarding targets", function() return sa.npcs end, function(v) sa.npcs = v end)
     local modes = {"Head", "Body", "Closest Part", "Weighted Random"}
