@@ -2077,8 +2077,7 @@ do
         local width, height = sa.radius * 2, sa.radius * 2
         ring.Size = UDim2.fromOffset(width, height)
     end))
-    local ctl, origAttack, origAim, wrappedAttack, wrappedAim, priorAttack, priorAim
-    local depth = 0
+    local ctl, origAttack, origAim, wrappedAttack, priorAttack
     local raycast
     local ok = g(function()
         raycast = requireGame(RS.Combat.CombatRaycast)
@@ -2091,7 +2090,7 @@ do
         end
         assert(ctl and type(ctl.attack) == "function" and type(ctl.aimHit) == "function", "Combat controller unavailable")
         origAttack, origAim = ctl.attack, ctl.aimHit
-        priorAttack, priorAim = rawget(ctl, "attack"), rawget(ctl, "aimHit")
+        priorAttack = rawget(ctl, "attack")
     end)
     local ready = ok and ctl and origAttack and origAim and raycast
     function sa.targetPart(character, targetHead)
@@ -2175,28 +2174,35 @@ do
     end
     sa.chooseTarget = function(radius, targetHead) if ready and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
     if ready then
-        wrappedAim = function(self, reach, spread, direction, ...)
-            if depth > 0 and alive and sa.on and self == ctl and not self.state.knife
-                and not self.menu and not sa.menuOpen then
-                local selected, targetDirection = pcall(choose, self, reach, sa.radius, sa.head, sa.targetMode)
-                sa.lastError = not selected and tostring(targetDirection) or nil
-                if selected and targetDirection then direction = targetDirection; sa.redirected = (sa.redirected or 0) + 1 end
-            end
-            return origAim(self, reach, spread, direction, ...)
-        end
         wrappedAttack = function(self, ...)
-            depth += 1
+            local camera = workspace.CurrentCamera
+            local originalFrame, aimedFrame
+            if alive and sa.on and self == ctl and camera and not self.state.knife
+                and not self.menu and not sa.menuOpen then
+                local selected, direction = pcall(choose, self, sa.range, sa.radius, sa.head, sa.targetMode)
+                sa.lastError = not selected and tostring(direction) or nil
+                if selected and direction then
+                    -- The game reads both aimLook and hit direction during attack.
+                    -- Give those reads the same aim, then restore the visible camera.
+                    originalFrame = camera.CFrame
+                    aimedFrame = CFrame.lookAt(originalFrame.Position, originalFrame.Position + direction)
+                    camera.CFrame = aimedFrame
+                    sa.redirected = (sa.redirected or 0) + 1
+                end
+            end
             local result = table.pack(pcall(origAttack, self, ...))
-            depth -= 1
+            if originalFrame and aimedFrame then
+                -- Preserve camera motion applied by the game's shot/recoil code.
+                camera.CFrame = originalFrame * aimedFrame:ToObjectSpace(camera.CFrame)
+            end
             if not result[1] then error(result[2], 0) end
             return table.unpack(result, 2, result.n)
         end
-        g(function() ctl.aimHit, ctl.attack = wrappedAim, wrappedAttack end)
+        g(function() ctl.attack = wrappedAttack end)
         sa.cleanup = function()
             sa.on = false
             g(function()
                 if rawget(ctl, "attack") == wrappedAttack then ctl.attack = priorAttack end
-                if rawget(ctl, "aimHit") == wrappedAim then ctl.aimHit = priorAim end
             end)
         end
     end
