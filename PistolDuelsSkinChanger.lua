@@ -2669,7 +2669,7 @@ end
 -- past corners can't help against another player: Practice (your shots only hit the practice targets there), the lobby
 -- (already third person, so the front view is what it adds) and a duel once the round is over. As soon as a round is
 -- being played again, it goes back to first person by itself. Only your own camera changes.
-do
+(function()
 	local OVER = { Result = true, MatchResult = true }   -- duel phases after the shooting has stopped
 	local view = 0      -- 0 first person, 1 behind you, 2 in front of you
 	local saved         -- the game's camera settings from before the view was turned on
@@ -2790,7 +2790,7 @@ do
 		RunService:BindToRenderStep("PDSkinChangerViewB", Enum.RenderPriority.Camera.Value + 3, after)
 	end)
 	if not okV then warn("[SkinChanger] could not start the third-person view: " .. tostring(eV)) end
-end
+end)()
 
 local function unload()
 	if not alive then return end
