@@ -234,6 +234,7 @@ pcall(function()
 	end
 end)
 local function save()
+    if sa.modulesPaused then return end
 	pcall(function()
 		if type(writefile) == "function" then
 			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
@@ -965,6 +966,7 @@ end
 -- Hide arms
 local armsSw, paintArms = makeSwitch("Hide arms", -226, -158, 62, function() return hideArms end)
 local function setHideArms(on)
+    if sa.modulesPaused then return end
 	hideArms = on and true or false
 	paintArms(true); save()
 	if hideArms then enforceArms() else restoreArms() end
@@ -2438,6 +2440,7 @@ do
         return key ~= nil and UIS:IsKeyDown(key)
     end
     function sa.handleInput(input, processed)
+        if sa.modulesPaused then return false end
         if binding then return false end
         if sa.capture then
             local key=input.KeyCode
@@ -2809,6 +2812,7 @@ end
 	local NAMES = { [0] = "First person", "Third person (behind you)", "Third person (in front of you)" }
 	viewApi.off = viewOff
 	function viewApi.cycle()
+        if sa.modulesPaused then return end
 		local at = where()
 		if not at then
 			setStatus("Third-person view is unavailable while spectating or outside a loaded character.", "bad")
@@ -2856,6 +2860,66 @@ end
 	end)
 	if not okV then warn("[SkinChanger] could not start the third-person view: " .. tostring(eV)) end
 end)()
+
+do
+    local master = button(win, "Modules ON", UDim2.new(0, 18, 1, -100), UDim2.fromOffset(112, 30), true)
+    master.Name = "MasterModules"
+    master.ZIndex = 102
+    local shield = make("TextButton", {
+        Name = "ModulesPaused", Text = "Modules paused", TextColor3 = C.text,
+        Font = Enum.Font.BuilderSansMedium, TextSize = 18, AutoButtonColor = false,
+        Position = UDim2.fromOffset(SIDE, 52), Size = UDim2.new(1, -SIDE, 1, -52),
+        BackgroundColor3 = C.bg, BackgroundTransparency = 0.08, BorderSizePixel = 0,
+        Visible = false, Active = true, ZIndex = 100,
+    }, win)
+    local switches = {
+        {sa, "on"}, {sa, "cameraOn"}, {sa, "spinOn"}, {sa, "thirdPerson"},
+        {sa, "showFov"}, {sa, "cameraShowFov"}, {sa.esp, "skeleton"}, {sa.esp, "headDot"},
+        {tr, "on"}, {spin, "on"}, {st, "on"}, {hud, "on"}, {wd, "on"},
+        {mb, "on"}, {vm, "on"}, {opt, "on"}, {shuffle, "on"},
+        {ui, "slideJump"}, {ui, "autoLoad"},
+    }
+    local snapshot, busy
+    function sa.setModulesEnabled(enabled)
+        if busy or enabled == not sa.modulesPaused then return end
+        busy = true
+        if not enabled then
+            snapshot = { flags = {}, skins = table.clone(sel), effects = table.clone(ammoFx), tints = {}, arms = hideArms }
+            for i, entry in ipairs(switches) do
+                snapshot.flags[i] = entry[1][entry[2]]
+                entry[1][entry[2]] = false
+            end
+            for weapon, tint in pairs(tints) do snapshot.tints[weapon] = tint.on; tint.on = false end
+            table.clear(sel)
+            table.clear(ammoFx)
+            sa.modulesPaused = true
+            hideArms = false
+            restoreArms()
+            sa.stopSpin()
+            if viewApi.off then viewApi.off() end
+            for _, tracer in ipairs(active) do recycle(tracer) end
+            table.clear(active)
+        else
+            for i, entry in ipairs(switches) do entry[1][entry[2]] = snapshot.flags[i] end
+            for weapon, on in pairs(snapshot.tints) do if tints[weapon] then tints[weapon].on = on end end
+            for weapon, skin in pairs(snapshot.skins) do sel[weapon] = skin end
+            for weapon, effect in pairs(snapshot.effects) do ammoFx[weapon] = effect end
+            hideArms = snapshot.arms
+            sa.modulesPaused = false
+            if hideArms then enforceArms() end
+            snapshot = nil
+        end
+        shield.Visible = sa.modulesPaused
+        master.Text = enabled and "Modules ON" or "Modules OFF"
+        for _, apply in ipairs({applyHud, applyWorld, applyOpt, unstretch, unFov, paintArms}) do pcall(apply) end
+        for _, repaint in ipairs(repaints) do pcall(repaint) end
+        pcall(refreshSkins)
+        -- Rebuild the held weapon so cosmetic overrides follow the master switch.
+        pcall(reEquip)
+        busy = false
+    end
+    master.MouseButton1Click:Connect(function() sa.setModulesEnabled(sa.modulesPaused == true) end)
+end
 
 local function unload()
 	if not alive then return end
