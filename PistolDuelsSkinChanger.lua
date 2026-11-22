@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -237,7 +237,7 @@ local function save()
     if sa.modulesPaused then return end
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { disableInLobby = sa.disableInLobby, spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
@@ -2072,7 +2072,7 @@ do
     accentObjs[#accentObjs + 1] = { outline, "Color" }
     keep(RunService.RenderStepped:Connect(function()
         local cam = workspace.CurrentCamera
-        ring.Visible = alive and sa.showFov and cam ~= nil
+        ring.Visible = alive and sa.showFov and not (sa.lobbyBlocked and sa.lobbyBlocked()) and cam ~= nil
         if not ring.Visible then return end
         local center = cam.ViewportSize * 0.5
         ring.Position = UDim2.fromOffset(center.X, center.Y)
@@ -2096,6 +2096,9 @@ do
         origAttack, origAim = ctl.attack, ctl.aimHit
         priorAttack = rawget(ctl, "attack")
     end)
+    function sa.lobbyBlocked()
+        return sa.disableInLobby and ctl ~= nil and ctl.state ~= nil and ctl.state.mode == "Lobby"
+    end
     local ready = ok and ctl and origAttack and origAim and raycast
     function sa.targetPart(character, targetHead)
         if targetHead then return character:FindFirstChild("Head") end
@@ -2185,7 +2188,7 @@ do
         end
         return best, bestCharacter
     end
-    sa.chooseTarget = function(radius, targetHead) if ready and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
+    sa.chooseTarget = function(radius, targetHead) if ready and not sa.lobbyBlocked() and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
     -- Invert the game's deterministic spread using the same seed and shot index.
     function sa.compensateSpread(direction, angle, rollX, rollY)
         local aim = direction
@@ -2211,7 +2214,7 @@ do
         wrappedAttack = function(self, ...)
             local camera = workspace.CurrentCamera
             local originalFrame, aimedFrame
-            if alive and sa.on and self == ctl and camera and not self.state.knife
+            if alive and sa.on and not sa.lobbyBlocked() and self == ctl and camera and not self.state.knife
                 and not self.menu and not sa.menuOpen then
                 local selected, direction = pcall(shotDirection, self)
                 sa.lastError = not selected and tostring(direction) or nil
@@ -2377,7 +2380,7 @@ do
     make("UIStroke", { Color = Color3.fromRGB(255,170,65), Thickness = 1.5, Transparency = 0.15, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ring)
     keep(RunService.RenderStepped:Connect(function()
         local camera = workspace.CurrentCamera
-        ring.Visible = alive and sa.cameraShowFov and camera ~= nil
+        ring.Visible = alive and sa.cameraShowFov and not sa.lobbyBlocked() and camera ~= nil
         if not ring.Visible then return end
         local center = camera.ViewportSize / 2
         ring.Position = UDim2.fromOffset(center.X,center.Y)
@@ -2389,7 +2392,7 @@ do
         return current:Lerp(goal, alpha)
     end
     function sa.cameraStep(dt)
-        if not alive or not sa.cameraOn or sa.menuOpen or freeCursor or not (sa.holdActive and sa.holdActive()) or UIS:GetFocusedTextBox() then return end
+        if not alive or not sa.cameraOn or sa.lobbyBlocked() or sa.menuOpen or freeCursor or not (sa.holdActive and sa.holdActive()) or UIS:GetFocusedTextBox() then return end
         local camera = workspace.CurrentCamera
         if not camera or camera.CameraType ~= Enum.CameraType.Custom then return end
         local clean, field = camera.CFrame, camera.FieldOfView
@@ -2416,6 +2419,7 @@ do
         {"players", "Target players", sa, "players"}, {"practice", "Target practice NPCs", sa, "npcs"},
         {"skeleton", "Skeleton ESP", sa.esp, "skeleton"}, {"dots", "ESP head dots", sa.esp, "headDot"},
         {"team", "ESP teammate filter", sa.esp, "hideTeam"}, {"espPractice", "ESP practice targets", sa.esp, "practice"},
+        {"lobby", "Disable aim / movement in lobby", sa, "disableInLobby"},
         {"spinBot", "Spin bot", sa, "spinOn"}, {"thirdPerson", "Third person", sa, "thirdPerson"},
         {"mode", "Cycle Silent Aim target mode"},
     }
@@ -2490,6 +2494,8 @@ do
     local cycle = button(viewCard, "Toggle third person", UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 30), false)
     cycle.MouseButton1Click:Connect(function() if viewApi.cycle then viewApi.cycle() end end)
     text(viewCard, "The view key toggles the camera behind your character. Change its binding in Settings. Mouse wheel adjusts distance.", 12, C.dim, UDim2.fromOffset(14, 218), UDim2.new(1, -28, 0, 90))
+    toggleRow(spinCard, 270, "Disable in lobby", function() return sa.disableInLobby end, function(v) sa.disableInLobby = v end)
+    text(spinCard, "Pauses aim, spin, third person and auto-slide in the lobby. Resumes when you leave.", 12, C.dim, UDim2.fromOffset(14, 310), UDim2.new(1, -28, 0, 70))
     local humanoid, autoRotate, spinYaw
     function sa.stopSpin()
         if humanoid and humanoid.Parent then humanoid.AutoRotate = autoRotate end
@@ -2499,7 +2505,7 @@ do
         local character = lp.Character
         local nextHumanoid = character and character:FindFirstChildOfClass("Humanoid")
         local root = character and character:FindFirstChild("HumanoidRootPart")
-        if not alive or not sa.spinOn or sa.menuOpen or not nextHumanoid or nextHumanoid.Health <= 0 or not root or root.Anchored or nextHumanoid.Sit then
+        if not alive or not sa.spinOn or sa.lobbyBlocked() or sa.menuOpen or not nextHumanoid or nextHumanoid.Health <= 0 or not root or root.Anchored or nextHumanoid.Sit then
             sa.stopSpin()
             return
         end
@@ -2716,7 +2722,7 @@ do
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	local armed = false   -- a jump is in the air and hasn't had its press yet
 	local hum, root, ch
-	local function ok() return alive and ui.slideJump and hum and root and not UIS:GetFocusedTextBox() end
+	local function ok() return alive and ui.slideJump and not sa.lobbyBlocked() and hum and root and not UIS:GetFocusedTextBox() end
 	local function hook(c)
 		ch = c
 		hum = c and c:WaitForChild("Humanoid", 5)
@@ -2828,6 +2834,14 @@ end
         setStatus(NAMES[view] .. ".  " .. ui.keyView .. " switches the view.", "good")
 	end
 	local function before()
+        if sa.lobbyBlocked() then
+            if view ~= 0 then
+                local requested = sa.thirdPerson
+                viewOff()
+                sa.thirdPerson = requested
+            end
+            return
+        end
         if sa.thirdPerson and view == 0 then
             saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance }
             view = 1
