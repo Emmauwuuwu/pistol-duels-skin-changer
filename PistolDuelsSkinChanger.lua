@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { airOn = false, airResponse = 8, disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -237,13 +237,13 @@ local function save()
     if sa.modulesPaused then return end
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { disableInLobby = sa.disableInLobby, spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { airOn = sa.airOn, airResponse = sa.airResponse, disableInLobby = sa.disableInLobby, spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
 end
 
-for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000); sa.spinSpeed = math.clamp(sa.spinSpeed == 360 and 1440 or sa.spinSpeed, 90, 7200); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
+for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000); sa.spinSpeed = math.clamp(sa.spinSpeed == 360 and 1440 or sa.spinSpeed, 90, 7200); sa.airResponse = math.clamp(sa.airResponse, 1, 30); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
 local function keyOf(name)
 	local ok, k = pcall(function() return Enum.KeyCode[name] end)
 	return ok and k or nil
@@ -1588,6 +1588,7 @@ do
 		local held, hw = heldModel()
 		if held then handle(held, hw) end
 		if model then handle(model, previewWeapon) end
+        for bodyModel, weapon in pairs(sa.bodySkinModels or {}) do handle(bodyModel, weapon) end
 		prune += 1
 		if prune >= 120 then   -- now and then, forget guns that were destroyed while tinted
 			prune = 0
@@ -2419,6 +2420,7 @@ do
         {"players", "Target players", sa, "players"}, {"practice", "Target practice NPCs", sa, "npcs"},
         {"skeleton", "Skeleton ESP", sa.esp, "skeleton"}, {"dots", "ESP head dots", sa.esp, "headDot"},
         {"team", "ESP teammate filter", sa.esp, "hideTeam"}, {"espPractice", "ESP practice targets", sa.esp, "practice"},
+        {"air", "Air steering", sa, "airOn"},
         {"lobby", "Disable aim / movement in lobby", sa, "disableInLobby"},
         {"spinBot", "Spin bot", sa, "spinOn"}, {"thirdPerson", "Third person", sa, "thirdPerson"},
         {"mode", "Cycle Silent Aim target mode"},
@@ -2488,14 +2490,15 @@ do
     local viewCard = card(0.5, 0.5, "Third person", sa.movementPage)
     toggleRow(spinCard, 48, "Enabled", function() return sa.spinOn end, function(v) sa.spinOn = v end)
     slider(spinCard, 100, "Spin speed", 90, 7200, 90, function() return sa.spinSpeed end, function(v) sa.spinSpeed = v end, function(v) return tostring(v) .. " deg/s" end)
-    text(spinCard, "Rotates your character while the menu is closed. Assign a toggle key in Controls.", 12, C.dim, UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 80))
+    toggleRow(spinCard, 160, "Air steering", function() return sa.airOn end, function(v) sa.airOn = v end)
+    slider(spinCard, 200, "Air control response", 1, 30, 1, function() return sa.airResponse end, function(v) sa.airResponse = v end, tostring)
     toggleRow(viewCard, 48, "Enabled", function() return sa.thirdPerson end, function(v) sa.thirdPerson = v end)
     slider(viewCard, 100, "Camera distance", 4, 24, 1, function() return sa.thirdDistance end, function(v) sa.thirdDistance = v end, function(v) return tostring(v) .. " studs" end)
     local cycle = button(viewCard, "Toggle third person", UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 30), false)
     cycle.MouseButton1Click:Connect(function() if viewApi.cycle then viewApi.cycle() end end)
     text(viewCard, "The view key toggles the camera behind your character. Change its binding in Settings. Mouse wheel adjusts distance.", 12, C.dim, UDim2.fromOffset(14, 218), UDim2.new(1, -28, 0, 90))
     toggleRow(spinCard, 270, "Disable in lobby", function() return sa.disableInLobby end, function(v) sa.disableInLobby = v end)
-    text(spinCard, "Pauses aim, spin, third person and auto-slide in the lobby. Resumes when you leave.", 12, C.dim, UDim2.fromOffset(14, 310), UDim2.new(1, -28, 0, 70))
+    text(spinCard, "Pauses aim, spin, air steering, third person and auto-slide in the lobby. Resumes when you leave.", 12, C.dim, UDim2.fromOffset(14, 310), UDim2.new(1, -28, 0, 70))
     local humanoid, autoRotate, spinYaw
     function sa.stopSpin()
         if humanoid and humanoid.Parent then humanoid.AutoRotate = autoRotate end
@@ -2519,7 +2522,29 @@ do
         spinYaw = (spinYaw + math.rad(sa.spinSpeed) * math.min(dt, 0.1)) % (2 * math.pi)
         root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, spinYaw, 0)
     end
-    keep(RunService.PreSimulation:Connect(function(dt) guarded("character spin", function() sa.spinStep(dt) end) end))
+    function sa.airVelocity(velocity, direction, speed, dt)
+        local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+        local input = Vector3.new(direction.X, 0, direction.Z)
+        if input.Magnitude < 0.01 then return velocity end
+        local target = input.Unit * math.max(horizontal.Magnitude, speed)
+        local alpha = 1 - math.exp(-sa.airResponse * math.max(0, dt))
+        local steered = horizontal:Lerp(target, alpha)
+        return Vector3.new(steered.X, velocity.Y, steered.Z)
+    end
+    function sa.airStep(dt)
+        if not alive or not sa.airOn or sa.modulesPaused or sa.lobbyBlocked() or sa.menuOpen or UIS:GetFocusedTextBox() then return end
+        local character = lp.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or humanoid.Health <= 0 or humanoid.Sit or not root or root.Anchored then return end
+        local state = humanoid:GetState()
+        if state ~= Enum.HumanoidStateType.Jumping and state ~= Enum.HumanoidStateType.Freefall then return end
+        root.AssemblyLinearVelocity = sa.airVelocity(root.AssemblyLinearVelocity, humanoid.MoveDirection, humanoid.WalkSpeed, dt)
+    end
+    keep(RunService.PreSimulation:Connect(function(dt)
+        guarded("character spin", function() sa.spinStep(dt) end)
+        guarded("air steering", function() sa.airStep(dt) end)
+    end))
 end)()
 end
 
@@ -2541,7 +2566,7 @@ do
         aim.Visible, esp.Visible, camera.Visible = page == aim, page == esp, page == camera
         controls.Visible = page == controls
         movement.Visible = page == movement
-        movementButton.BackgroundTransparency = page == movement and 0.1 or 0.8
+        movementButton.BackgroundTransparency = page == movement and 0.65 or 0.8
         sa.capture = nil
         aimButton.BackgroundTransparency = page == aim and 0.1 or 0.8
         espButton.BackgroundTransparency = page == esp and 0.1 or 0.8
@@ -2558,6 +2583,7 @@ end
 
 
 local function defaults()
+    sa.airOn, sa.airResponse = false, 8
     sa.spinOn, sa.spinSpeed, sa.thirdPerson, sa.thirdDistance = false, 1440, false, 10
     sa.on = false
 	tr.on, tr.color, tr.thick, tr.life, tr.glow, tr.streak, tr.replace = false, "Cyan", 0.12, 0.6, true, false, true
@@ -2766,7 +2792,7 @@ end
 	local saved         -- the game's camera settings from before the view was turned on
 	-- how far the camera sits from you. The game keeps pulling its own zoom back to first person, so the distance is
 	-- held here (closest = farthest = zoom) and the mouse wheel changes it.
-	sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
+	sa.airResponse = math.clamp(sa.airResponse, 1, 30); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
 	local hidden = {}   -- parts of the first-person gun and arms hidden while the view is on
 	-- the game's combat controller (read only): which mode and round phase you're in
 	local combat, nextFind = nil, 0
@@ -2887,7 +2913,7 @@ do
         Visible = false, Active = true, ZIndex = 100,
     }, win)
     local switches = {
-        {sa, "on"}, {sa, "cameraOn"}, {sa, "spinOn"}, {sa, "thirdPerson"},
+        {sa, "on"}, {sa, "cameraOn"}, {sa, "spinOn"}, {sa, "thirdPerson"}, {sa, "airOn"},
         {sa, "showFov"}, {sa, "cameraShowFov"}, {sa.esp, "skeleton"}, {sa.esp, "headDot"},
         {tr, "on"}, {spin, "on"}, {st, "on"}, {hud, "on"}, {wd, "on"},
         {mb, "on"}, {vm, "on"}, {opt, "on"}, {shuffle, "on"},
@@ -2907,6 +2933,7 @@ do
             table.clear(sel)
             table.clear(ammoFx)
             sa.modulesPaused = true
+            sa.clearBodySkins()
             hideArms = false
             restoreArms()
             sa.stopSpin()
@@ -2935,10 +2962,105 @@ do
     master.MouseButton1Click:Connect(function() sa.setModulesEnabled(sa.modulesPaused == true) end)
 end
 
+do
+(function()
+    local entries = {}
+    sa.bodySkinModels = {}
+    local function remove(source)
+        local entry = entries[source]
+        if not entry then return end
+        for part, transparency in pairs(entry.originalParts) do
+            if part.Parent then part.LocalTransparencyModifier = transparency end
+        end
+        sa.bodySkinModels[entry.model] = nil
+        if FC and FC.unbind then g(function() FC.unbind(entry.model) end) end
+        entry.model:Destroy()
+        entries[source] = nil
+    end
+    function sa.clearBodySkins()
+        for source in pairs(entries) do remove(source) end
+    end
+    local elapsed, scanning = 0, false
+    keep(RunService.Heartbeat:Connect(function(dt)
+        elapsed += dt
+        if scanning or elapsed < 0.2 then return end
+        elapsed, scanning = 0, true
+        local ok, err = pcall(function()
+            local character = lp.Character
+            for source in pairs(entries) do
+                if not alive or sa.modulesPaused or not character or source.Parent ~= character then remove(source) end
+            end
+            if not alive or sa.modulesPaused or not character then return end
+            for _, source in ipairs(character:GetChildren()) do
+                if source:IsA("Model") and (source.Name == "PDHeldWeapon" or source.Name == "PDHolsteredWeapon" or source.Name == "PDHolsteredKnife") then
+                    local weapon = source:GetAttribute("PDPreset")
+                    local roll = shuffle.on and rolled[weapon]
+                    local id = roll and roll.id or sel[weapon]
+                    local pattern = roll and roll.pat or pat[weapon] or 1
+                    local wearValue = roll and roll.wear or wear[weapon] or 0
+                    local key = tostring(id) .. ":" .. tostring(pattern) .. ":" .. tostring(wearValue)
+                    if entries[source] and entries[source].key ~= key then remove(source) end
+                    if not id then remove(source)
+                    elseif not entries[source] then
+                        local created, model = g(function()
+                            return WM.createBody(weapon, id)
+                        end)
+                        if created and typeof(model) == "Instance" and model:IsA("Model") then
+                            local prepared, prepareError = pcall(function()
+                                model.Name = "PDSkinBodyOverride"
+                                model:ScaleTo(source:GetScale())
+                                local parts = model:QueryDescendants("BasePart")
+                                for _, joint in ipairs(model:QueryDescendants("JointInstance, WeldConstraint")) do joint:Destroy() end
+                                for _, part in ipairs(parts) do
+                                    part.Anchored = true
+                                    part.CanCollide, part.CanTouch, part.CanQuery = false, false, false
+                                end
+                                if FC then
+                                    local bound, bindError = g(function()
+                                        FC.bind(model, { skinId = id, pattern = pattern, wear = wearValue }, 0, { fullDetail = true, transient = false })
+                                    end)
+                                    if not bound then error(bindError, 0) end
+                                end
+                                if not alive or sa.modulesPaused or source.Parent ~= lp.Character then error("Body weapon changed during rebuild", 0) end
+                                model:PivotTo(source:GetPivot())
+                                model.Parent = character
+                                local originalParts = {}
+                                for _, part in ipairs(source:QueryDescendants("BasePart")) do originalParts[part] = part.LocalTransparencyModifier end
+                                entries[source] = { model = model, parts = parts, originalParts = originalParts, key = key }
+                                sa.bodySkinModels[model] = weapon
+                            end)
+                            if not prepared then
+                                if FC and FC.unbind then g(function() FC.unbind(model) end) end
+                                model:Destroy()
+                                error(prepareError, 0)
+                            end
+                        elseif not created then error(model, 0) end
+                    end
+                end
+            end
+        end)
+        scanning = false
+        sa.bodySkinError = not ok and tostring(err) or nil
+    end))
+    keep(RunService.RenderStepped:Connect(function()
+        local camera = workspace.CurrentCamera
+        local head = lp.Character and lp.Character:FindFirstChild("Head")
+        local visible = camera and head and (camera.CFrame.Position - head.Position).Magnitude > 2
+        for source, entry in pairs(entries) do
+            if source.Parent and entry.model.Parent then
+                entry.model:PivotTo(source:GetPivot())
+                for part in pairs(entry.originalParts) do if part.Parent then part.LocalTransparencyModifier = 1 end end
+                for _, part in ipairs(entry.parts) do part.LocalTransparencyModifier = visible and 0 or 1 end
+            end
+        end
+    end))
+end)()
+end
+
 local function unload()
 	if not alive then return end
 	alive = false
-    pcall(sa.cleanup); pcall(sa.esp.cleanup); pcall(sa.stopSpin)
+    pcall(sa.cleanup); pcall(sa.esp.cleanup); pcall(sa.stopSpin); pcall(sa.clearBodySkins)
 	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
