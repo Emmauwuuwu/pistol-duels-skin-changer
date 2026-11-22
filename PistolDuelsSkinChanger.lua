@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { spinOn = false, spinSpeed = 360, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -242,7 +242,7 @@ local function save()
 	end)
 end
 
-for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000); sa.spinSpeed = math.clamp(sa.spinSpeed, 90, 1440); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
+for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000); sa.spinSpeed = math.clamp(sa.spinSpeed == 360 and 1440 or sa.spinSpeed, 90, 7200); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
 local function keyOf(name)
 	local ok, k = pcall(function() return Enum.KeyCode[name] end)
 	return ok and k or nil
@@ -2117,11 +2117,15 @@ do
             end
         end
     end
+    function sa.shotOrigin(camera)
+        local head = lp.Character and lp.Character:FindFirstChild("Head")
+        return sa.thirdPerson and head and head.Position or camera.CFrame.Position
+    end
     local function choose(self, reach, radius, targetHead, mode)
         local camera = workspace.CurrentCamera
         if not camera or not lp.Character then return end
         reach = math.min(reach, combatConfig.Prototype.GunReach)
-        local origin = camera.CFrame.Position
+        local origin = mode and sa.shotOrigin(camera) or camera.CFrame.Position
         local bestDistance = math.huge
         local best, bestCharacter
         local groups = {}
@@ -2152,7 +2156,11 @@ do
                     local inside, screenDistance = sa.circleContains(camera, part.Position, radius)
                     if inside and (screenDistance < bestDistance or mode == "Weighted Random") then
                         -- The game's raycast enforces region and wall visibility.
-                        local hit = origAim(self, reach, 0, direction)
+                        local frame = camera.CFrame
+                        camera.CFrame = CFrame.new(origin) * frame.Rotation
+                        local hitOK, hit = pcall(origAim, self, reach, 0, direction)
+                        camera.CFrame = frame
+                        if not hitOK then error(hit, 0) end
                         if hit and self:enemyFromHit(hit) == character then
                             if screenDistance < bestDistance then
                                 bestDistance, best = screenDistance, direction
@@ -2209,7 +2217,8 @@ do
                     -- The game reads both aimLook and hit direction during attack.
                     -- Give those reads the same aim, then restore the visible camera.
                     originalFrame = camera.CFrame
-                    aimedFrame = CFrame.lookAt(originalFrame.Position, originalFrame.Position + direction)
+                    local origin = sa.shotOrigin(camera)
+                    aimedFrame = CFrame.lookAt(origin, origin + direction)
                     camera.CFrame = aimedFrame
                     sa.redirected = (sa.redirected or 0) + 1
                 end
@@ -2471,17 +2480,17 @@ do
     local spinCard = card(0, 0.5, "Spin bot", sa.movementPage)
     local viewCard = card(0.5, 0.5, "Third person", sa.movementPage)
     toggleRow(spinCard, 48, "Enabled", function() return sa.spinOn end, function(v) sa.spinOn = v end)
-    slider(spinCard, 100, "Spin speed", 90, 1440, 30, function() return sa.spinSpeed end, function(v) sa.spinSpeed = v end, function(v) return tostring(v) .. " deg/s" end)
+    slider(spinCard, 100, "Spin speed", 90, 7200, 90, function() return sa.spinSpeed end, function(v) sa.spinSpeed = v end, function(v) return tostring(v) .. " deg/s" end)
     text(spinCard, "Rotates your character while the menu is closed. Assign a toggle key in Controls.", 12, C.dim, UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 80))
     toggleRow(viewCard, 48, "Enabled", function() return sa.thirdPerson end, function(v) sa.thirdPerson = v end)
     slider(viewCard, 100, "Camera distance", 4, 24, 1, function() return sa.thirdDistance end, function(v) sa.thirdDistance = v end, function(v) return tostring(v) .. " studs" end)
-    local cycle = button(viewCard, "Cycle camera view", UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 30), false)
+    local cycle = button(viewCard, "Toggle third person", UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 30), false)
     cycle.MouseButton1Click:Connect(function() if viewApi.cycle then viewApi.cycle() end end)
-    text(viewCard, "The view key cycles first person, behind and front. Change its binding in Settings. Mouse wheel adjusts distance.", 12, C.dim, UDim2.fromOffset(14, 218), UDim2.new(1, -28, 0, 90))
-    local humanoid, autoRotate
+    text(viewCard, "The view key toggles the camera behind your character. Change its binding in Settings. Mouse wheel adjusts distance.", 12, C.dim, UDim2.fromOffset(14, 218), UDim2.new(1, -28, 0, 90))
+    local humanoid, autoRotate, spinYaw
     function sa.stopSpin()
         if humanoid and humanoid.Parent then humanoid.AutoRotate = autoRotate end
-        humanoid, autoRotate = nil, nil
+        humanoid, autoRotate, spinYaw = nil, nil, nil
     end
     function sa.spinStep(dt)
         local character = lp.Character
@@ -2494,9 +2503,12 @@ do
         if humanoid ~= nextHumanoid then
             sa.stopSpin()
             humanoid, autoRotate = nextHumanoid, nextHumanoid.AutoRotate
+            local _, yaw = root.CFrame:ToOrientation()
+            spinYaw = yaw
         end
         humanoid.AutoRotate = false
-        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(sa.spinSpeed) * math.min(dt, 0.1), 0)
+        spinYaw = (spinYaw + math.rad(sa.spinSpeed) * math.min(dt, 0.1)) % (2 * math.pi)
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, spinYaw, 0)
     end
     keep(RunService.PreSimulation:Connect(function(dt) guarded("character spin", function() sa.spinStep(dt) end) end))
 end)()
@@ -2537,7 +2549,7 @@ end
 
 
 local function defaults()
-    sa.spinOn, sa.spinSpeed, sa.thirdPerson, sa.thirdDistance = false, 360, false, 10
+    sa.spinOn, sa.spinSpeed, sa.thirdPerson, sa.thirdDistance = false, 1440, false, 10
     sa.on = false
 	tr.on, tr.color, tr.thick, tr.life, tr.glow, tr.streak, tr.replace = false, "Cyan", 0.12, 0.6, true, false, true
 	spin.on, spin.speed, spin.dir, spin.axis, spin.mode = false, 180, 1, "Y", "Continuous"
@@ -2738,7 +2750,7 @@ do
 end
 
 -- ===================== third-person view =====================
--- The view key cycles first person, behind and front. Spectating uses the game camera.
+-- The view key toggles the camera behind the character. Spectating uses the game camera.
 (function()
 	local OVER = { Result = true, MatchResult = true }   -- duel phases after the shooting has stopped
 	local view = 0      -- 0 first person, 1 behind you, 2 in front of you
@@ -2802,7 +2814,7 @@ end
 			setStatus("Third-person view is unavailable while spectating or outside a loaded character.", "bad")
 			return
 		end
-		local nextView = (view + 1) % 3
+		local nextView = (view + 1) % 2
 		if nextView == 0 then viewOff()
 		else
 			if not saved then saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance } end
@@ -2811,13 +2823,7 @@ end
 		sa.thirdPerson = view ~= 0; save()
         setStatus(NAMES[view] .. ".  " .. ui.keyView .. " switches the view.", "good")
 	end
-	local flipped, backCF   -- the front view's camera, and the one behind you it was turned from
-	-- before the game's camera code runs: put back the camera the front view turned around, so the next frame starts
-	-- from where you really look
 	local function before()
-		local cam = workspace.CurrentCamera
-		if flipped and cam.CFrame == flipped then cam.CFrame = backCF end
-		flipped = nil
         if sa.thirdPerson and view == 0 then
             saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance }
             view = 1
@@ -2834,9 +2840,7 @@ end
 			sa.thirdDistance = math.clamp(sa.thirdDistance - i.Position.Z * 1.5, 4, 24); save()
 		end
 	end))
-	-- after the game's camera code: hide the first-person gun, and turn the camera around for the front view
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
+	-- Hide first-person arms after the camera update.
 	local function after()
 		if view == 0 then return end
 		hideFirstPerson()
@@ -2845,18 +2849,6 @@ end
 		if lp.CameraMode == Enum.CameraMode.Classic and where() ~= "Lobby" and not (freeCursor or sa.menuOpen or (combat and rawget(combat, "menu"))) then
 			UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 		end
-		local cam = workspace.CurrentCamera
-		if view ~= 2 or cam.CameraType ~= Enum.CameraType.Custom then return end
-		local cf, focus = cam.CFrame, cam.Focus.Position
-		local dist = (cf.Position - focus).Magnitude
-		if dist < 1 then return end
-		local goal = focus + cf.LookVector * dist
-		params.FilterDescendantsInstances = { lp.Character, cam }
-		local hit = workspace:Raycast(focus, goal - focus, params)
-		if hit then goal = focus + (goal - focus).Unit * math.max(0.5, hit.Distance - 0.3) end
-		backCF = cf
-		cam.CFrame = CFrame.lookAt(goal, focus)
-		flipped = cam.CFrame
 	end
 	local okV, eV = pcall(function()
 		RunService:BindToRenderStep("PDSkinChangerViewA", Enum.RenderPriority.Camera.Value - 2, before)
