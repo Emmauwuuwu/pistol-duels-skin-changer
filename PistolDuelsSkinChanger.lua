@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { spinOn = false, spinSpeed = 360, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -236,13 +236,13 @@ end)
 local function save()
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
 end
 
-for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000)
+for _, key in ipairs({ "headWeight", "bodyWeight", "limbWeight" }) do sa[key] = math.clamp(sa[key], 0, 100) end; if not table.find({ "Head", "Body", "Closest Part", "Weighted Random" }, sa.targetMode) then sa.targetMode = "Closest Part" end; sa.cameraRadius = math.clamp(sa.cameraRadius, 10, 600); sa.cameraSpeed = math.clamp(sa.cameraSpeed, 1, 30); sa.radius = math.clamp(sa.radius, 10, 600); sa.fov = math.clamp(sa.fov, 1, 120); sa.range = math.clamp(sa.range, 10, 1000); sa.spinSpeed = math.clamp(sa.spinSpeed, 90, 1440); sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
 local function keyOf(name)
 	local ok, k = pcall(function() return Enum.KeyCode[name] end)
 	return ok and k or nil
@@ -1994,7 +1994,7 @@ end
 keyRow(44, "Show / hide window", "keyMenu")
 keyRow(80, "Free cursor", "keyCursor")
 keyRow(116, "Third-person view", "keyView")
-text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used. The view key switches first person, behind you and in front of you, in Practice, the lobby and after a round ends (never while a round is being played).", 12, C.dim, UDim2.fromOffset(14, 156), UDim2.new(1, -28, 0, 60))
+text(hkCard, "Click a key box, then press the new key. Esc cancels. Only keyboard keys can be used. The view key switches first person, behind you and in front of you, during play. Third-person distance is in Not So Legit > Movement.", 12, C.dim, UDim2.fromOffset(14, 156), UDim2.new(1, -28, 0, 60))
 paintKeys()
 text(hkCard, "MOVEMENT", 11, C.dim, UDim2.fromOffset(14, 222), UDim2.new(1, -28, 0, 14), nil, Enum.Font.BuilderSansMedium)
 toggleRow(hkCard, 242, "Auto slide on jump", function() return ui.slideJump end, function(v) ui.slideJump = v end)
@@ -2405,6 +2405,7 @@ do
         {"players", "Target players", sa, "players"}, {"practice", "Target practice NPCs", sa, "npcs"},
         {"skeleton", "Skeleton ESP", sa.esp, "skeleton"}, {"dots", "ESP head dots", sa.esp, "headDot"},
         {"team", "ESP teammate filter", sa.esp, "hideTeam"}, {"espPractice", "ESP practice targets", sa.esp, "practice"},
+        {"spinBot", "Spin bot", sa, "spinOn"}, {"thirdPerson", "Third person", sa, "thirdPerson"},
         {"mode", "Cycle Silent Aim target mode"},
     }
     local rows = make("ScrollingFrame", { Name = "Bindings", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1,0,1,-48), Position = UDim2.fromOffset(0,48), CanvasSize = UDim2.fromOffset(0,(#actions+1)*38), ScrollBarThickness = 5 }, sa.controlsPage)
@@ -2464,22 +2465,62 @@ do
     repaints[#repaints+1]=paint
 end
 
+sa.movementPage = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
+do
+(function()
+    local spinCard = card(0, 0.5, "Spin bot", sa.movementPage)
+    local viewCard = card(0.5, 0.5, "Third person", sa.movementPage)
+    toggleRow(spinCard, 48, "Enabled", function() return sa.spinOn end, function(v) sa.spinOn = v end)
+    slider(spinCard, 100, "Spin speed", 90, 1440, 30, function() return sa.spinSpeed end, function(v) sa.spinSpeed = v end, function(v) return tostring(v) .. " deg/s" end)
+    text(spinCard, "Rotates your character while the menu is closed. Assign a toggle key in Controls.", 12, C.dim, UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 80))
+    toggleRow(viewCard, 48, "Enabled", function() return sa.thirdPerson end, function(v) sa.thirdPerson = v end)
+    slider(viewCard, 100, "Camera distance", 4, 24, 1, function() return sa.thirdDistance end, function(v) sa.thirdDistance = v end, function(v) return tostring(v) .. " studs" end)
+    local cycle = button(viewCard, "Cycle camera view", UDim2.fromOffset(14, 170), UDim2.new(1, -28, 0, 30), false)
+    cycle.MouseButton1Click:Connect(function() if viewApi.cycle then viewApi.cycle() end end)
+    text(viewCard, "The view key cycles first person, behind and front. Change its binding in Settings. Mouse wheel adjusts distance.", 12, C.dim, UDim2.fromOffset(14, 218), UDim2.new(1, -28, 0, 90))
+    local humanoid, autoRotate
+    function sa.stopSpin()
+        if humanoid and humanoid.Parent then humanoid.AutoRotate = autoRotate end
+        humanoid, autoRotate = nil, nil
+    end
+    function sa.spinStep(dt)
+        local character = lp.Character
+        local nextHumanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if not alive or not sa.spinOn or sa.menuOpen or not nextHumanoid or nextHumanoid.Health <= 0 or not root or root.Anchored or nextHumanoid.Sit then
+            sa.stopSpin()
+            return
+        end
+        if humanoid ~= nextHumanoid then
+            sa.stopSpin()
+            humanoid, autoRotate = nextHumanoid, nextHumanoid.AutoRotate
+        end
+        humanoid.AutoRotate = false
+        root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(sa.spinSpeed) * math.min(dt, 0.1), 0)
+    end
+    keep(RunService.PreSimulation:Connect(function(dt) guarded("character spin", function() sa.spinStep(dt) end) end))
+end)()
+end
+
 sa.hub = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
 do
-    local aim, esp, camera, controls = sa.page, sa.esp.page, sa.cameraPage, sa.controlsPage
-    for _, page in ipairs({aim, esp, camera, controls}) do
+    local aim, esp, camera, controls, movement = sa.page, sa.esp.page, sa.cameraPage, sa.controlsPage, sa.movementPage
+    for _, page in ipairs({aim, esp, camera, controls, movement}) do
         page.Parent = sa.hub
         page.Position = UDim2.fromOffset(0, 40)
         page.Size = UDim2.new(1, 0, 1, -40)
     end
     aim.Visible, esp.Visible, camera.Visible = false, false, true
-    local aimButton = button(sa.hub, "Aim & FOV", UDim2.fromOffset(0, 0), UDim2.fromOffset(140, 30), true)
-    local espButton = button(sa.hub, "Skeleton ESP", UDim2.fromOffset(150, 0), UDim2.fromOffset(140, 30), false)
-    local cameraButton = button(sa.hub, "Aim Assist", UDim2.fromOffset(300, 0), UDim2.fromOffset(140, 30), false)
-    local controlsButton = button(sa.hub, "Controls", UDim2.fromOffset(450, 0), UDim2.fromOffset(120, 30), false)
+    local aimButton = button(sa.hub, "Aim & FOV", UDim2.fromOffset(0, 0), UDim2.fromOffset(110, 30), true)
+    local espButton = button(sa.hub, "Skeleton ESP", UDim2.fromOffset(115, 0), UDim2.fromOffset(110, 30), false)
+    local cameraButton = button(sa.hub, "Aim Assist", UDim2.fromOffset(230, 0), UDim2.fromOffset(110, 30), false)
+    local controlsButton = button(sa.hub, "Controls", UDim2.fromOffset(460, 0), UDim2.fromOffset(110, 30), false)
+    local movementButton = button(sa.hub, "Movement", UDim2.fromOffset(345, 0), UDim2.fromOffset(110, 30), false)
     local function selectPage(page)
         aim.Visible, esp.Visible, camera.Visible = page == aim, page == esp, page == camera
         controls.Visible = page == controls
+        movement.Visible = page == movement
+        movementButton.BackgroundTransparency = page == movement and 0.1 or 0.8
         sa.capture = nil
         aimButton.BackgroundTransparency = page == aim and 0.1 or 0.8
         espButton.BackgroundTransparency = page == esp and 0.1 or 0.8
@@ -2490,11 +2531,13 @@ do
     espButton.MouseButton1Click:Connect(function() selectPage(esp) end)
     cameraButton.MouseButton1Click:Connect(function() selectPage(camera) end)
     controlsButton.MouseButton1Click:Connect(function() selectPage(controls) end)
-    selectPage(camera)
+    movementButton.MouseButton1Click:Connect(function() selectPage(movement) end)
+    selectPage(movement)
 end
 
 
 local function defaults()
+    sa.spinOn, sa.spinSpeed, sa.thirdPerson, sa.thirdDistance = false, 360, false, 10
     sa.on = false
 	tr.on, tr.color, tr.thick, tr.life, tr.glow, tr.streak, tr.replace = false, "Cyan", 0.12, 0.6, true, false, true
 	spin.on, spin.speed, spin.dir, spin.axis, spin.mode = false, 180, 1, "Y", "Continuous"
@@ -2695,17 +2738,14 @@ do
 end
 
 -- ===================== third-person view =====================
--- The view key cycles first person, behind you and in front of you, like Minecraft's F5. It only works where seeing
--- past corners can't help against another player: Practice (your shots only hit the practice targets there), the lobby
--- (already third person, so the front view is what it adds) and a duel once the round is over. As soon as a round is
--- being played again, it goes back to first person by itself. Only your own camera changes.
+-- The view key cycles first person, behind and front. Spectating uses the game camera.
 (function()
 	local OVER = { Result = true, MatchResult = true }   -- duel phases after the shooting has stopped
 	local view = 0      -- 0 first person, 1 behind you, 2 in front of you
 	local saved         -- the game's camera settings from before the view was turned on
 	-- how far the camera sits from you. The game keeps pulling its own zoom back to first person, so the distance is
 	-- held here (closest = farthest = zoom) and the mouse wheel changes it.
-	local zoom = 10
+	sa.thirdDistance = math.clamp(sa.thirdDistance, 4, 24)
 	local hidden = {}   -- parts of the first-person gun and arms hidden while the view is on
 	-- the game's combat controller (read only): which mode and round phase you're in
 	local combat, nextFind = nil, 0
@@ -2724,7 +2764,7 @@ end
 		if type(s) ~= "table" then return nil end
 		local duels = rawget(c, "duels")
 		if duels and duels.spectator and duels.spectator.active then return nil end
-		if s.mode == "Practice" or s.mode == "Lobby" then return s.mode end
+		if s.mode == "Practice" or s.mode == "Lobby" or (s.mode == "Duel" and not s.eliminated and not s.watching) then return s.mode end
 		local round = duels and duels.round
 		if s.mode == "Duel" and round and round.matchId == s.match and OVER[round.phase] then return "Over" end
 		return nil
@@ -2746,13 +2786,12 @@ end
 	local function viewOff()
 		local was = saved
 		view, saved = 0, nil
+        sa.thirdPerson = false
 		showFirstPerson()
 		if was then
 			lp.CameraMinZoomDistance, lp.CameraMaxZoomDistance = was.min, was.max
 			-- the camera mode the game itself picks: free in the lobby, locked to first person everywhere else
-			local c = combatCtl()
-			local s = c and rawget(c, "state")
-			lp.CameraMode = (type(s) == "table" and s.mode == "Lobby") and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
+			lp.CameraMode = was.mode
 		end
 	end
 	local NAMES = { [0] = "First person", "Third person (behind you)", "Third person (in front of you)" }
@@ -2760,7 +2799,7 @@ end
 	function viewApi.cycle()
 		local at = where()
 		if not at then
-			setStatus("Third-person view works in Practice, the lobby and after a round ends, not while a round is being played.", "bad")
+			setStatus("Third-person view is unavailable while spectating or outside a loaded character.", "bad")
 			return
 		end
 		local nextView = (view + 1) % 3
@@ -2769,7 +2808,8 @@ end
 			if not saved then saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance } end
 			view = nextView
 		end
-		setStatus(NAMES[view] .. ".  " .. ui.keyView .. " switches the view.", "good")
+		sa.thirdPerson = view ~= 0; save()
+        setStatus(NAMES[view] .. ".  " .. ui.keyView .. " switches the view.", "good")
 	end
 	local flipped, backCF   -- the front view's camera, and the one behind you it was turned from
 	-- before the game's camera code runs: put back the camera the front view turned around, so the next frame starts
@@ -2778,17 +2818,20 @@ end
 		local cam = workspace.CurrentCamera
 		if flipped and cam.CFrame == flipped then cam.CFrame = backCF end
 		flipped = nil
+        if sa.thirdPerson and view == 0 then
+            saved = { mode = lp.CameraMode, min = lp.CameraMinZoomDistance, max = lp.CameraMaxZoomDistance }
+            view = 1
+        elseif not sa.thirdPerson and view ~= 0 then viewOff() end
 		if view == 0 then return end
 		local at = alive and where()
 		if not at then viewOff(); return end
-		if at == "Lobby" then return end   -- the lobby camera is already out behind you, with the game's own zoom
 		lp.CameraMode = Enum.CameraMode.Classic
-		if lp.CameraMaxZoomDistance ~= zoom then lp.CameraMaxZoomDistance = zoom end
-		if lp.CameraMinZoomDistance ~= zoom then lp.CameraMinZoomDistance = zoom end
+		if lp.CameraMaxZoomDistance ~= sa.thirdDistance then lp.CameraMaxZoomDistance = sa.thirdDistance end
+		if lp.CameraMinZoomDistance ~= sa.thirdDistance then lp.CameraMinZoomDistance = sa.thirdDistance end
 	end
 	keep(UIS.InputChanged:Connect(function(i, gp)
 		if view ~= 0 and not gp and i.UserInputType == Enum.UserInputType.MouseWheel then
-			zoom = math.clamp(zoom - i.Position.Z * 1.5, 4, 24)
+			sa.thirdDistance = math.clamp(sa.thirdDistance - i.Position.Z * 1.5, 4, 24); save()
 		end
 	end))
 	-- after the game's camera code: hide the first-person gun, and turn the camera around for the front view
@@ -2799,7 +2842,7 @@ end
 		hideFirstPerson()
 		-- Roblox's camera frees the mouse in this camera mode every frame: lock it again so the mouse turns the camera
 		-- like in first person, unless a menu or the free cursor needs it (the lobby keeps the game's own mouse)
-		if lp.CameraMode == Enum.CameraMode.Classic and where() ~= "Lobby" and not (freeCursor or win.Visible or rawget(combat, "menu")) then
+		if lp.CameraMode == Enum.CameraMode.Classic and where() ~= "Lobby" and not (freeCursor or sa.menuOpen or (combat and rawget(combat, "menu"))) then
 			UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 		end
 		local cam = workspace.CurrentCamera
@@ -2825,7 +2868,7 @@ end)()
 local function unload()
 	if not alive then return end
 	alive = false
-    pcall(sa.cleanup); pcall(sa.esp.cleanup)
+    pcall(sa.cleanup); pcall(sa.esp.cleanup); pcall(sa.stopSpin)
 	for _, name in ipairs({ "PDSkinChangerArms", "PDSkinChangerCursor", "PDSkinChangerFx", "PDSkinChangerSelf", "PDSkinChangerBlur", "PDSkinChangerTint", "PDSkinChangerStretchB", "PDSkinChangerStretchA", "PDSkinChangerViewA", "PDSkinChangerViewB" }) do
 		pcall(function() RunService:UnbindFromRenderStep(name) end)
 	end
