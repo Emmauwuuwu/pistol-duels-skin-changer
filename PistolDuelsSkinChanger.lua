@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { airOn = false, airResponse = 8, disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { airOn = false, airResponse = 8, disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { enabled = true, box = false, boxMode = "2D", names = false, distance = false, health = false, healthMode = "Both", tracers = false, chams = false, glow = false, snaplines = false, weapon = false, teamColor = false, visibility = false, arrows = false, radar = false, fov = false, velocity = false, hitboxes = false, status = false, target = false, throughWalls = true, tracerOrigin = "Bottom", snapOrigin = "Center", color = "Accent", hiddenColor = "Red", maxDistance = 1500, textSize = 13, chamsOpacity = 0.45, fovRadius = 150, radarRange = 200, radarSize = 180, targetUserId = 0, page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -233,11 +233,19 @@ pcall(function()
 		end
 	end
 end)
+function sa.espSettings()
+    local settings = {}
+    for key, value in pairs(sa.esp) do
+        if type(value) == "boolean" or type(value) == "number" or type(value) == "string" then settings[key] = value end
+    end
+    settings.lastError = nil
+    return settings
+end
 local function save()
     if sa.modulesPaused then return end
 	pcall(function()
 		if type(writefile) == "function" then
-			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = { skeleton = sa.esp.skeleton, headDot = sa.esp.headDot, hideTeam = sa.esp.hideTeam, practice = sa.esp.practice, thickness = sa.esp.thickness, dotRadius = sa.esp.dotRadius }, sa = { airOn = sa.airOn, airResponse = sa.airResponse, disableInLobby = sa.disableInLobby, spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
+			writefile(SAVE_FILE, HttpService:JSONEncode({ esp = sa.espSettings(), sa = { airOn = sa.airOn, airResponse = sa.airResponse, disableInLobby = sa.disableInLobby, spinOn = sa.spinOn, spinSpeed = sa.spinSpeed, thirdPerson = sa.thirdPerson, thirdDistance = sa.thirdDistance, binds = sa.binds, cameraHold = sa.cameraHold, on = sa.on, cameraOn = sa.cameraOn, targetMode = sa.targetMode, headWeight = sa.headWeight, bodyWeight = sa.bodyWeight, limbWeight = sa.limbWeight, cameraHead = sa.cameraHead, cameraRadius = sa.cameraRadius, cameraShowFov = sa.cameraShowFov, cameraSmooth = sa.cameraSmooth, cameraSpeed = sa.cameraSpeed, radius = sa.radius, showFov = sa.showFov, fov = sa.fov, range = sa.range, players = sa.players, npcs = sa.npcs, head = sa.head }, sel = sel, pat = pat, wear = wear, seenHelp = seenHelp, hideArms = hideArms, tr = tr, spin = spin, st = st, hud = hud, wd = wd, mb = mb,
 				vm = vm, opt = opt, tints = tints, ammoFx = ammoFx, ui = ui, shuffle = shuffle, fav = fav, loadouts = loadouts }))
 		end
 	end)
@@ -2189,7 +2197,14 @@ do
         end
         return best, bestCharacter
     end
-    sa.chooseTarget = function(radius, targetHead) if ready and not sa.lobbyBlocked() and ctl:canAct() then return choose(ctl, sa.range, radius, targetHead) end end
+    sa.chooseTarget = function(radius, targetHead)
+        if ready and not sa.lobbyBlocked() and ctl:canAct() then
+            local direction, target = choose(ctl, sa.range, radius, targetHead)
+            sa.targetCharacter = target
+            return direction, target
+        end
+        sa.targetCharacter = nil
+    end
     -- Invert the game's deterministic spread using the same seed and shot index.
     function sa.compensateSpread(direction, angle, rollX, rollY)
         local aim = direction
@@ -2200,7 +2215,8 @@ do
         return aim
     end
     local function shotDirection(self)
-        local direction = choose(self, sa.range, sa.radius, sa.head, sa.targetMode)
+        local direction, target = choose(self, sa.range, sa.radius, sa.head, sa.targetMode)
+        sa.targetCharacter = target
         if not direction then return end
         local state = self.state
         local humanoid = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
@@ -2271,34 +2287,153 @@ do
 end
 
 do
+(function()
     local es = sa.esp
-    es.page = make("Frame", { Position = UDim2.fromOffset(14, 96), Size = UDim2.new(1, -28, 1, -156), BackgroundTransparency = 1, Visible = false }, win)
-    local options = card(0, 0.5, "Skeleton ESP", es.page)
-    local appearance = card(0.5, 0.5, "Appearance", es.page)
-    toggleRow(options, 48, "Skeleton", function() return es.skeleton end, function(v) es.skeleton = v end)
-    toggleRow(options, 84, "Head dot", function() return es.headDot end, function(v) es.headDot = v end)
-    toggleRow(options, 120, "Hide teammates", function() return es.hideTeam end, function(v) es.hideTeam = v end)
-    toggleRow(options, 156, "Practice targets", function() return es.practice end, function(v) es.practice = v end)
-    slider(appearance, 48, "Line thickness", 1, 4, 0.5, function() return es.thickness end, function(v) es.thickness = v end, function(v) return tostring(v) .. " px" end)
-    slider(appearance, 114, "Head dot radius", 2, 10, 1, function() return es.dotRadius end, function(v) es.dotRadius = v end, function(v) return tostring(v) .. " px" end)
-    text(appearance, "Uses your accent color. Draws over the world, excludes you, and supports R6 and R15 characters.", 12, C.dim, UDim2.fromOffset(14, 190), UDim2.new(1, -28, 0, 90))
-    local overlay = make("ScreenGui", { Name = "PDSkeletonOverlay", IgnoreGuiInset = true, ResetOnSpawn = false, DisplayOrder = 49 }, lp.PlayerGui)
-    es.cleanup = function() overlay:Destroy() end
-    local layer = make("Frame", { Name = "SkeletonESP", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ClipsDescendants = true, Active = false }, overlay)
-    local r6 = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
-    local r15 = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
+    local features = {
+        {"box", "Box ESP"}, {"skeleton", "Skeleton ESP"}, {"names", "Name ESP"},
+        {"distance", "Distance ESP"}, {"health", "Health ESP"}, {"tracers", "Tracer ESP"},
+        {"chams", "Chams"}, {"glow", "Glow ESP"}, {"headDot", "Head dot"},
+        {"snaplines", "Snaplines"}, {"weapon", "Weapon ESP"}, {"teamColor", "Team colors"},
+        {"visibility", "Visibility check"}, {"arrows", "Offscreen arrows"}, {"radar", "Radar ESP"},
+        {"fov", "FOV circle"}, {"velocity", "Velocity ESP"}, {"hitboxes", "Hitbox bounds"},
+        {"status", "Status ESP"}, {"target", "Target highlight"},
+    }
+    for key, range in pairs({
+        thickness = {1, 4}, dotRadius = {2, 10}, textSize = {10, 20}, maxDistance = {50, 5000},
+        chamsOpacity = {0.1, 1}, fovRadius = {10, 600}, radarRange = {25, 1000}, radarSize = {120, 300},
+    }) do es[key] = math.clamp(es[key], range[1], range[2]) end
+    es.features = features
+    es.page = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
+    local options = card(0, 0.5, "Player ESP", es.page)
+    local appearance = card(0.5, 0.5, "Appearance and filters", es.page)
+    local function scroll(parent, height)
+        return make("ScrollingFrame", { BackgroundTransparency = 1, BorderSizePixel = 0,
+            Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 1, -48),
+            CanvasSize = UDim2.fromOffset(0, height), ScrollBarThickness = 4 }, parent)
+    end
+    local rows = scroll(options, 32 * (#features + 1))
+    local settings = scroll(appearance, 1140)
+    toggleRow(rows, 0, "ESP enabled", function() return es.enabled end, function(v) es.enabled = v end)
+    for i, feature in ipairs(features) do
+        local key = feature[1]
+        toggleRow(rows, i * 32, feature[2], function() return es[key] end, function(v) es[key] = v end)
+    end
+    local function choice(y, label, key, values)
+        local b = button(settings, "", UDim2.fromOffset(14, y), UDim2.new(1, -32, 0, 28), false)
+        local function paint() b.Text = label .. ": " .. tostring(es[key]) end
+        b.MouseButton1Click:Connect(function()
+            es[key] = values[(table.find(values, es[key]) or 1) % #values + 1]
+            paint(); save()
+        end)
+        repaints[#repaints + 1] = paint
+        paint()
+    end
+    toggleRow(settings, 0, "Hide teammates", function() return es.hideTeam end, function(v) es.hideTeam = v end)
+    toggleRow(settings, 32, "Practice targets", function() return es.practice end, function(v) es.practice = v end)
+    toggleRow(settings, 64, "Highlights through walls", function() return es.throughWalls end, function(v) es.throughWalls = v end)
+    choice(102, "Boxes", "boxMode", {"2D", "3D"})
+    choice(138, "Health", "healthMode", {"Bar", "Number", "Both"})
+    choice(174, "Tracer origin", "tracerOrigin", {"Bottom", "Center", "Top", "Mouse"})
+    choice(210, "Snapline origin", "snapOrigin", {"Center", "Bottom", "Top", "Mouse"})
+    choice(246, "Visible color", "color", {"Accent", "White", "Cyan", "Green", "Gold", "Pink"})
+    choice(282, "Obstructed color", "hiddenColor", {"Red", "Orange", "White", "Purple"})
+    slider(settings, 328, "Maximum distance", 50, 5000, 50, function() return es.maxDistance end, function(v) es.maxDistance = v end, function(v) return tostring(v) .. " studs" end)
+    slider(settings, 394, "Line thickness", 1, 4, 0.5, function() return es.thickness end, function(v) es.thickness = v end, tostring)
+    slider(settings, 460, "Head dot radius", 2, 10, 1, function() return es.dotRadius end, function(v) es.dotRadius = v end, tostring)
+    slider(settings, 526, "Text size", 10, 20, 1, function() return es.textSize end, function(v) es.textSize = v end, tostring)
+    slider(settings, 592, "Chams opacity", 0.1, 1, 0.1, function() return es.chamsOpacity end, function(v) es.chamsOpacity = v end, tostring)
+    slider(settings, 658, "ESP FOV radius", 10, 600, 1, function() return es.fovRadius end, function(v) es.fovRadius = v end, function(v) return tostring(v) .. " px" end)
+    slider(settings, 724, "Radar range", 25, 1000, 25, function() return es.radarRange end, function(v) es.radarRange = v end, function(v) return tostring(v) .. " studs" end)
+    slider(settings, 790, "Radar size", 120, 300, 10, function() return es.radarSize end, function(v) es.radarSize = v end, function(v) return tostring(v) .. " px" end)
+    local targetButton = button(settings, "", UDim2.fromOffset(14, 860), UDim2.new(1, -32, 0, 32), false)
+    local function targetLabel()
+        local player = Players:GetPlayerByUserId(es.targetUserId)
+        targetButton.Text = es.targetUserId == 0 and "Target: current aim target" or "Target: " .. (player and player.Name or "player left")
+    end
+    targetButton.MouseButton1Click:Connect(function()
+        local ids = {0}
+        local players = Players:GetPlayers()
+        table.sort(players, function(a, b) return a.Name < b.Name end)
+        for _, player in ipairs(players) do if player ~= lp then ids[#ids + 1] = player.UserId end end
+        es.targetUserId = ids[(table.find(ids, es.targetUserId) or 1) % #ids + 1]
+        targetLabel(); save()
+    end)
+    targetLabel()
+    repaints[#repaints + 1] = targetLabel
+    text(settings, "Click Target to cycle players. Tracers end at the feet; snaplines end at the torso. Radar is camera-relative. Hitbox bounds show body parts. ESP FOV is a separate visual circle.", 12, C.dim, UDim2.fromOffset(14, 910), UDim2.new(1, -32, 0, 170))
+
+    local overlay = make("ScreenGui", { Name = "PDPlayerESP", IgnoreGuiInset = true, ResetOnSpawn = false, DisplayOrder = 49 }, lp.PlayerGui)
+    local layer = make("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ClipsDescendants = true }, overlay)
+    local world = make("Folder", { Name = "PDPlayerESPWorld" }, workspace)
+    local function line(parent, name)
+        return make("Frame", { Name = name, AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, Visible = false, Active = false }, parent)
+    end
+    local function label(parent, name)
+        return make("TextLabel", { Name = name, AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(240, 80), Font = Enum.Font.BuilderSansMedium, TextSize = es.textSize,
+            TextStrokeTransparency = 0.25, TextColor3 = C.text, Visible = false }, parent)
+    end
+    local function dot(parent, name)
+        local frame = line(parent, name)
+        make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, frame)
+        return frame
+    end
+    local function segment(frame, a, b, color)
+        if a.Z <= 0.1 or b.Z <= 0.1 then frame.Visible = false; return end
+        local delta = Vector2.new(b.X - a.X, b.Y - a.Y)
+        frame.Visible = delta.Magnitude > 0.1
+        frame.Position = UDim2.fromOffset((a.X + b.X) / 2, (a.Y + b.Y) / 2)
+        frame.Size = UDim2.fromOffset(delta.Magnitude, es.thickness)
+        frame.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+        frame.BackgroundColor3 = color
+    end
+    local palette = { White = Color3.new(1, 1, 1), Cyan = Color3.fromRGB(70, 230, 255), Green = Color3.fromRGB(80, 240, 130),
+        Gold = Color3.fromRGB(255, 205, 65), Pink = Color3.fromRGB(255, 110, 190), Red = Color3.fromRGB(255, 75, 80),
+        Orange = Color3.fromRGB(255, 150, 60), Purple = Color3.fromRGB(180, 110, 255) }
+    local function chosenColor(name) return palette[name] or C.accent end
+    local ring = make("Frame", { Name = "ESPFOV", AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Visible = false }, layer)
+    make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, ring)
+    local ringStroke = make("UIStroke", { Thickness = 1.5, Color = C.accent }, ring)
+    local radar = make("Frame", { Name = "Radar", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 80),
+        BackgroundColor3 = Color3.fromRGB(15, 20, 28), BackgroundTransparency = 0.2, BorderSizePixel = 0, Visible = false }, layer)
+    make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, radar)
+    make("UIStroke", { Thickness = 1, Color = Color3.fromRGB(140, 150, 170), Transparency = 0.45 }, radar)
+    make("Frame", { Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.new(0, 1, 1, -20), BorderSizePixel = 0, BackgroundTransparency = 0.8 }, radar)
+    make("Frame", { Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -20, 0, 1), BorderSizePixel = 0, BackgroundTransparency = 0.8 }, radar)
+    local selfDot = dot(radar, "You")
+    selfDot.Visible, selfDot.Position, selfDot.Size, selfDot.BackgroundColor3 = true, UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(6, 6), Color3.new(1, 1, 1)
+    local bonesR6 = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
+    local bonesR15 = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
+    local edges = {{1,2},{1,3},{1,5},{2,4},{2,6},{3,4},{3,7},{4,8},{5,6},{5,7},{6,8},{7,8}}
     local entries, nextScan = {}, 0
     local combatRay
     g(function() combatRay = requireGame(RS.Combat.CombatRaycast) end)
+    local function remove(character)
+        local entry = entries[character]
+        entry.group:Destroy(); entry.radarDot:Destroy()
+        if entry.highlight then entry.highlight:Destroy() end
+        for _, box in pairs(entry.hitboxes) do box:Destroy() end
+        entries[character] = nil
+    end
     local function add(character, owner)
         if character == lp.Character or entries[character] then return end
-        local group = make("Frame", { Name = character.Name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Active = false }, layer)
-        local entry = { group = group, owner = owner, lines = {} }
-        for i = 1, #r15 do
-            entry.lines[i] = make("Frame", { Name = "Bone" .. i, AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, BackgroundColor3 = C.accent, Active = false, Visible = false }, group)
-        end
-        entry.dot = make("Frame", { Name = "HeadDot", AnchorPoint = Vector2.new(0.5, 0.5), BorderSizePixel = 0, BackgroundColor3 = C.accent, Active = false, Visible = false }, group)
-        make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, entry.dot)
+        local group = make("Frame", { Name = character.Name, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, layer)
+        local entry = { group = group, owner = owner, bones = {}, boxLines = {}, hitboxes = {}, visibleAt = 0, visible = true }
+        for i = 1, 14 do entry.bones[i] = line(group, "Bone") end
+        for i = 1, 12 do entry.boxLines[i] = line(group, "BoxEdge") end
+        entry.box = make("Frame", { Name = "Box2D", BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false }, group)
+        entry.boxStroke = make("UIStroke", { Thickness = es.thickness, Color = C.accent }, entry.box)
+        entry.head = dot(group, "HeadDot")
+        entry.name = label(group, "Name")
+        entry.details = label(group, "Details")
+        entry.tracer = line(group, "Tracer")
+        entry.snap = line(group, "Snapline")
+        entry.velocity = line(group, "Velocity")
+        entry.velocityTip = label(group, "VelocityTip"); entry.velocityTip.Text = "▲"; entry.velocityTip.TextSize = 14; entry.velocityTip.Size = UDim2.fromOffset(16, 16)
+        entry.arrow = label(group, "OffscreenArrow"); entry.arrow.Text = "▲"; entry.arrow.TextSize = 24; entry.arrow.Size = UDim2.fromOffset(26, 26)
+        entry.radarDot = dot(radar, character.Name); entry.radarDot.Size = UDim2.fromOffset(5, 5)
+        entry.health = make("Frame", { Name = "Health", BackgroundColor3 = Color3.fromRGB(20, 20, 20), BorderSizePixel = 0, Visible = false }, group)
+        entry.healthFill = make("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), BorderSizePixel = 0 }, entry.health)
         entries[character] = entry
     end
     local function scan()
@@ -2311,57 +2446,223 @@ do
                 if character:GetAttribute("PDPracticeTarget") == true then present[character] = true; add(character, nil) end
             end
         end
-        for character, entry in pairs(entries) do
-            if not present[character] or not character.Parent then entry.group:Destroy(); entries[character] = nil end
-        end
+        for character in pairs(entries) do if not present[character] or not character.Parent then remove(character) end end
     end
-    keep(RunService.RenderStepped:Connect(function()
-
-        layer.Visible = alive and (es.skeleton or es.headDot)
-        if not layer.Visible then return end
+    local function team(owner)
+        if not owner then return nil end
+        local match, side = owner:GetAttribute("PDMatch"), owner:GetAttribute("PDTeam")
+        if match ~= nil and side ~= nil then return tostring(match) .. "/" .. tostring(side) end
+        if not owner.Neutral and owner.Team then return owner.Team.Name end
+        return nil
+    end
+    local function teamTint(owner)
+        if owner and owner.Team and not owner.Neutral then return owner.TeamColor.Color end
+        local value = tostring(owner and owner:GetAttribute("PDTeam") or "")
+        local hash = 0
+        for i = 1, #value do hash = (hash * 31 + string.byte(value, i)) % 360 end
+        return value ~= "" and Color3.fromHSV(hash / 360, 0.65, 1) or chosenColor(es.color)
+    end
+    local function bounds(character, root)
+        local low, high = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                local relative = root.CFrame:ToObjectSpace(part.CFrame)
+                local half = part.Size / 2
+                local r, u, l = relative.RightVector, relative.UpVector, relative.LookVector
+                local extent = Vector3.new(math.abs(r.X)*half.X + math.abs(u.X)*half.Y + math.abs(l.X)*half.Z,
+                    math.abs(r.Y)*half.X + math.abs(u.Y)*half.Y + math.abs(l.Y)*half.Z,
+                    math.abs(r.Z)*half.X + math.abs(u.Z)*half.Y + math.abs(l.Z)*half.Z)
+                low = low:Min(relative.Position - extent)
+                high = high:Max(relative.Position + extent)
+            end
+        end
+        return root.CFrame * CFrame.new((low + high) / 2), (high - low) / 2
+    end
+    local function screenOrigin(name, viewport)
+        if name == "Mouse" then local mouse = UIS:GetMouseLocation(); return Vector3.new(mouse.X, mouse.Y, 1) end
+        local y = name == "Top" and 4 or name == "Center" and viewport.Y / 2 or viewport.Y - 4
+        return Vector3.new(viewport.X / 2, y, 1)
+    end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.IgnoreWater = true
+    local function visible(character, camera, root, head)
+        for _, part in ipairs({head or root, root}) do
+            local hit = workspace:Raycast(camera.CFrame.Position, part.Position - camera.CFrame.Position, rayParams)
+            if not hit or hit.Instance:IsDescendantOf(character) then return true end
+        end
+        return false
+    end
+    local function hide(entry)
+        entry.group.Visible = false
+        entry.radarDot.Visible = false
+        if entry.highlight then entry.highlight.Enabled = false end
+        for _, box in pairs(entry.hitboxes) do box.Visible = false end
+    end
+    local function statusOf(character, owner, humanoid, root)
+        local function attr(name) return character:GetAttribute(name) or (owner and owner:GetAttribute(name)) end
+        if attr("PDSliding") then return "Sliding" end
+        if attr("PDCrouching") then return "Crouching" end
+        if humanoid.Sit then return "Seated" end
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then return "Airborne" end
+        if root.AssemblyLinearVelocity.Magnitude > 2 then return "Moving" end
+        return "Standing"
+    end
+    local function step()
         local camera = workspace.CurrentCamera
-        if not camera then layer.Visible = false; return end
+        local active = alive and es.enabled and not sa.modulesPaused and camera ~= nil
+        layer.Visible = active
+        if not active then for _, entry in pairs(entries) do hide(entry) end; return end
+        local viewport, center = camera.ViewportSize, camera.ViewportSize / 2
+        ring.Visible = es.fov
+        ring.Position, ring.Size = UDim2.fromOffset(center.X, center.Y), UDim2.fromOffset(es.fovRadius * 2, es.fovRadius * 2)
+        ringStroke.Color, ringStroke.Thickness = chosenColor(es.color), es.thickness
+        radar.Visible, radar.Size = es.radar, UDim2.fromOffset(es.radarSize, es.radarSize)
         if os.clock() >= nextScan then nextScan = os.clock() + 0.5; scan() end
+        rayParams.FilterDescendantsInstances = {lp.Character, camera, world}
+        local localRoot = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        local origin = localRoot and localRoot.Position or camera.CFrame.Position
         for character, entry in pairs(entries) do
-            local hum = character:FindFirstChildOfClass("Humanoid")
+            hide(entry)
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local root = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+            local head = character:FindFirstChild("Head")
             local owner = entry.owner
-            local sameTeam = owner and lp:GetAttribute("PDMatch") ~= nil and owner:GetAttribute("PDMatch") == lp:GetAttribute("PDMatch") and lp:GetAttribute("PDTeam") ~= nil and owner:GetAttribute("PDTeam") == lp:GetAttribute("PDTeam")
-            entry.group.Visible = character.Parent ~= nil and character ~= lp.Character and hum ~= nil and hum.Health > 0 and not (es.hideTeam and sameTeam) and (owner ~= nil or es.practice)
-            if entry.group.Visible then
-                local bones = character:FindFirstChild("UpperTorso") and r15 or r6
-                for i, line in ipairs(entry.lines) do
-                    line.Visible = false
+            local sameTeam = team(owner) ~= nil and team(owner) == team(lp)
+            local distance = root and (root.Position - origin).Magnitude or math.huge
+            if humanoid and humanoid.Health > 0 and root and distance <= es.maxDistance and not (es.hideTeam and sameTeam) then
+                entry.group.Visible = true
+                local point, onScreen = camera:WorldToViewportPoint(root.Position)
+                local target = es.target and ((es.targetUserId ~= 0 and owner and owner.UserId == es.targetUserId) or (es.targetUserId == 0 and sa.targetCharacter == character))
+                if es.visibility and os.clock() >= entry.visibleAt then
+                    entry.visible = visible(character, camera, root, head)
+                    entry.visibleAt = os.clock() + 0.15
+                end
+                local color = es.teamColor and teamTint(owner) or chosenColor(es.color)
+                if es.visibility and not entry.visible then color = chosenColor(es.hiddenColor) end
+                if target then color = palette.Gold end
+                local boxFrame, half = bounds(character, root)
+                local projected, low, high, front = {}, Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge), true
+                for _, x in ipairs({-1, 1}) do for _, y in ipairs({-1, 1}) do for _, z in ipairs({-1, 1}) do
+                    local corner = camera:WorldToViewportPoint(boxFrame:PointToWorldSpace(Vector3.new(x*half.X, y*half.Y, z*half.Z)))
+                    projected[#projected + 1] = corner
+                    front = front and corner.Z > 0.1
+                    low = low:Min(Vector2.new(corner.X, corner.Y)); high = high:Max(Vector2.new(corner.X, corner.Y))
+                end end end
+                entry.box.Visible = es.box and es.boxMode == "2D" and front and onScreen
+                if entry.box.Visible then
+                    entry.box.Position, entry.box.Size = UDim2.fromOffset(low.X, low.Y), UDim2.fromOffset(high.X-low.X, high.Y-low.Y)
+                    entry.boxStroke.Color, entry.boxStroke.Thickness = color, es.thickness
+                end
+                for i, frame in ipairs(entry.boxLines) do
+                    frame.Visible = false
+                    if es.box and es.boxMode == "3D" then segment(frame, projected[edges[i][1]], projected[edges[i][2]], color) end
+                end
+                local bones = character:FindFirstChild("UpperTorso") and bonesR15 or bonesR6
+                for i, frame in ipairs(entry.bones) do
+                    frame.Visible = false
                     local bone = bones[i]
-                    local p1 = bone and character:FindFirstChild(bone[1])
-                    local p2 = bone and character:FindFirstChild(bone[2])
-                    if es.skeleton and p1 and p2 and p1:IsA("BasePart") and p2:IsA("BasePart") then
-                        local a = camera:WorldToViewportPoint(p1.Position)
-                        local b = camera:WorldToViewportPoint(p2.Position)
-                        if a.Z > 0.1 and b.Z > 0.1 then
-                            local dx, dy = b.X-a.X, b.Y-a.Y
-                            local length = math.sqrt(dx*dx + dy*dy)
-                            if length > 0.1 then
-                                line.Position = UDim2.fromOffset((a.X+b.X)/2, (a.Y+b.Y)/2)
-                                line.Size = UDim2.fromOffset(length, es.thickness)
-                                line.Rotation = math.deg(math.atan2(dy,dx))
-                                line.BackgroundColor3 = C.accent; line.Visible = true
-                            end
+                    local a, b = bone and character:FindFirstChild(bone[1]), bone and character:FindFirstChild(bone[2])
+                    if es.skeleton and a and b then segment(frame, camera:WorldToViewportPoint(a.Position), camera:WorldToViewportPoint(b.Position), color) end
+                end
+                entry.head.Visible = false
+                if es.headDot and head then
+                    local h, shown = camera:WorldToViewportPoint(head.Position)
+                    entry.head.Visible = shown and h.Z > 0.1
+                    entry.head.Position, entry.head.Size = UDim2.fromOffset(h.X, h.Y), UDim2.fromOffset(es.dotRadius*2, es.dotRadius*2)
+                    entry.head.BackgroundColor3 = color
+                end
+                entry.name.Visible = es.names and onScreen and front
+                entry.name.Text = owner and owner.Name or character.Name
+                entry.name.Position = UDim2.fromOffset(point.X, low.Y - es.textSize)
+                local details = {}
+                if es.distance then details[#details + 1] = tostring(math.floor(distance + 0.5)) .. " studs" end
+                if es.health and es.healthMode ~= "Bar" then details[#details + 1] = tostring(math.ceil(humanoid.Health)) .. " HP" end
+                if es.weapon then
+                    local held = character:FindFirstChild("PDHeldWeapon")
+                    local weapon = held and held:GetAttribute("PDPreset")
+                    if not weapon then local tool = character:FindFirstChildOfClass("Tool"); weapon = tool and tool.Name end
+                    details[#details + 1] = weapon and tostring(weapon) or "Unarmed"
+                end
+                if es.status then details[#details + 1] = statusOf(character, owner, humanoid, root) end
+                if es.visibility then details[#details + 1] = entry.visible and "Visible" or "Obstructed" end
+                entry.details.Visible = #details > 0 and onScreen and front
+                entry.details.Text = table.concat(details, " · ")
+                entry.details.Position = UDim2.fromOffset(point.X, high.Y + es.textSize)
+                entry.details.Size = UDim2.fromOffset(420, es.textSize * 2)
+                entry.name.TextColor3, entry.details.TextColor3 = color, color
+                entry.name.TextSize, entry.details.TextSize = es.textSize, es.textSize
+                entry.health.Visible = es.health and es.healthMode ~= "Number" and front and onScreen
+                if entry.health.Visible then
+                    local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+                    entry.health.Position, entry.health.Size = UDim2.fromOffset(low.X - 7, low.Y), UDim2.fromOffset(3, high.Y - low.Y)
+                    entry.healthFill.Size = UDim2.fromScale(1, ratio)
+                    entry.healthFill.BackgroundColor3 = Color3.fromHSV(ratio / 3, 0.9, 1)
+                end
+                entry.tracer.Visible, entry.snap.Visible = false, false
+                if es.tracers and onScreen and front then segment(entry.tracer, screenOrigin(es.tracerOrigin, viewport), Vector3.new(point.X, high.Y, 1), color) end
+                if es.snaplines and onScreen then segment(entry.snap, screenOrigin(es.snapOrigin, viewport), point, color) end
+                entry.velocity.Visible, entry.velocityTip.Visible = false, false
+                if es.velocity and onScreen and root.AssemblyLinearVelocity.Magnitude > 0.5 then
+                    local endpoint = camera:WorldToViewportPoint(root.Position + root.AssemblyLinearVelocity * 0.3)
+                    segment(entry.velocity, point, endpoint, color)
+                    entry.velocityTip.Visible = entry.velocity.Visible
+                    entry.velocityTip.Position, entry.velocityTip.Rotation = UDim2.fromOffset(endpoint.X, endpoint.Y), entry.velocity.Rotation + 90
+                    entry.velocityTip.TextColor3 = color
+                end
+                entry.arrow.Visible = es.arrows and not onScreen
+                if entry.arrow.Visible then
+                    local offset = Vector2.new(point.X, point.Y) - center
+                    if point.Z < 0 then offset = -offset end
+                    if offset.Magnitude < 0.01 then offset = Vector2.new(0, 1) end
+                    offset = offset.Unit
+                    local radius = math.min((center.X-28)/math.max(math.abs(offset.X), 0.001), (center.Y-28)/math.max(math.abs(offset.Y), 0.001))
+                    local position = center + offset * radius
+                    entry.arrow.Position, entry.arrow.Rotation = UDim2.fromOffset(position.X, position.Y), math.deg(math.atan2(offset.Y, offset.X)) + 90
+                    entry.arrow.TextColor3 = color
+                end
+                entry.radarDot.Visible = es.radar and distance <= es.radarRange
+                if entry.radarDot.Visible then
+                    local flat = root.Position - origin
+                    local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+                    forward = forward.Magnitude > 0.01 and forward.Unit or Vector3.new(0, 0, -1)
+                    local right = forward:Cross(Vector3.yAxis)
+                    local scale = (es.radarSize / 2 - 9) / es.radarRange
+                    entry.radarDot.Position = UDim2.fromOffset(es.radarSize/2 + flat:Dot(right)*scale, es.radarSize/2 - flat:Dot(forward)*scale)
+                    entry.radarDot.BackgroundColor3 = color
+                end
+                if es.chams or es.glow or target then
+                    if not entry.highlight then entry.highlight = make("Highlight", { Adornee = character, Name = character.Name }, world) end
+                    entry.highlight.Enabled = true
+                    entry.highlight.FillColor, entry.highlight.OutlineColor = color, color
+                    entry.highlight.FillTransparency = es.chams and 1 - es.chamsOpacity or 1
+                    entry.highlight.OutlineTransparency = (es.glow or target) and 0 or 1
+                    entry.highlight.DepthMode = es.throughWalls and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+                end
+                if es.hitboxes then
+                    for _, part in ipairs(character:GetChildren()) do
+                        if part:IsA("BasePart") and part ~= root then
+                            if not entry.hitboxes[part] then entry.hitboxes[part] = make("SelectionBox", { Adornee = part, SurfaceTransparency = 1, LineThickness = 0.025 }, world) end
+                            entry.hitboxes[part].Visible, entry.hitboxes[part].Color3 = true, color
                         end
                     end
                 end
-                entry.dot.Visible = false
-                local head = character:FindFirstChild("Head")
-                if es.headDot and head and head:IsA("BasePart") then
-                    local point, onScreen = camera:WorldToViewportPoint(head.Position)
-                    if onScreen and point.Z > 0.1 then
-                        entry.dot.Position = UDim2.fromOffset(point.X, point.Y)
-                        entry.dot.Size = UDim2.fromOffset(es.dotRadius*2, es.dotRadius*2)
-                        entry.dot.BackgroundColor3 = C.accent; entry.dot.Visible = true
-                    end
-                end
+                for part, box in pairs(entry.hitboxes) do if not part.Parent then box:Destroy(); entry.hitboxes[part] = nil end end
             end
         end
+    end
+    es.cleanup = function()
+        for character in pairs(entries) do remove(character) end
+        overlay:Destroy(); world:Destroy()
+    end
+    es.step = step
+    es.entries = entries
+    keep(RunService.RenderStepped:Connect(function()
+        local ok, err = pcall(step)
+        es.lastError = not ok and tostring(err) or nil
     end))
+end)()
 end
 
 sa.cameraPage = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
@@ -2425,6 +2726,12 @@ do
         {"spinBot", "Spin bot", sa, "spinOn"}, {"thirdPerson", "Third person", sa, "thirdPerson"},
         {"mode", "Cycle Silent Aim target mode"},
     }
+    actions[#actions + 1] = {"esp_enabled", "ESP enabled", sa.esp, "enabled"}
+    for _, feature in ipairs(sa.esp.features) do
+        if feature[1] ~= "skeleton" and feature[1] ~= "headDot" then
+            actions[#actions + 1] = {"esp_" .. feature[1], feature[2], sa.esp, feature[1]}
+        end
+    end
     local rows = make("ScrollingFrame", { Name = "Bindings", BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1,0,1,-48), Position = UDim2.fromOffset(0,48), CanvasSize = UDim2.fromOffset(0,(#actions+1)*38), ScrollBarThickness = 5 }, sa.controlsPage)
     text(sa.controlsPage, "Click a binding, then press a key. Esc cancels; Backspace clears. Settings and enabled states save automatically.", 12, C.dim, UDim2.fromOffset(14,0), UDim2.new(1,-28,0,42))
     local buttons = {}
@@ -2563,7 +2870,7 @@ do
     end
     aim.Visible, esp.Visible, camera.Visible = false, false, true
     local aimButton = button(sa.hub, "Aim & FOV", UDim2.fromOffset(0, 0), UDim2.fromOffset(110, 30), true)
-    local espButton = button(sa.hub, "Skeleton ESP", UDim2.fromOffset(115, 0), UDim2.fromOffset(110, 30), false)
+    local espButton = button(sa.hub, "Player ESP", UDim2.fromOffset(115, 0), UDim2.fromOffset(110, 30), false)
     local cameraButton = button(sa.hub, "Aim Assist", UDim2.fromOffset(230, 0), UDim2.fromOffset(110, 30), false)
     local controlsButton = button(sa.hub, "Controls", UDim2.fromOffset(460, 0), UDim2.fromOffset(110, 30), false)
     local movementButton = button(sa.hub, "Movement", UDim2.fromOffset(345, 0), UDim2.fromOffset(110, 30), false)
@@ -2919,7 +3226,7 @@ do
     }, win)
     local switches = {
         {sa, "on"}, {sa, "cameraOn"}, {sa, "spinOn"}, {sa, "thirdPerson"}, {sa, "airOn"},
-        {sa, "showFov"}, {sa, "cameraShowFov"}, {sa.esp, "skeleton"}, {sa.esp, "headDot"},
+        {sa, "showFov"}, {sa, "cameraShowFov"}, {sa.esp, "enabled"}, {sa.esp, "skeleton"}, {sa.esp, "headDot"},
         {tr, "on"}, {spin, "on"}, {st, "on"}, {hud, "on"}, {wd, "on"},
         {mb, "on"}, {vm, "on"}, {opt, "on"}, {shuffle, "on"},
         {ui, "slideJump"}, {ui, "autoLoad"},
