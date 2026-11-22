@@ -2526,10 +2526,15 @@ do
         local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
         local input = Vector3.new(direction.X, 0, direction.Z)
         if input.Magnitude < 0.01 then return velocity end
-        local target = input.Unit * math.max(horizontal.Magnitude, speed)
         local alpha = 1 - math.exp(-sa.airResponse * math.max(0, dt))
-        local steered = horizontal:Lerp(target, alpha)
-        return Vector3.new(steered.X, velocity.Y, steered.Z)
+        local magnitude = horizontal.Magnitude
+        local targetAngle = math.atan2(input.X, input.Z)
+        local currentAngle = magnitude > 0.001 and math.atan2(horizontal.X, horizontal.Z) or targetAngle
+        local difference = math.atan2(math.sin(targetAngle - currentAngle), math.cos(targetAngle - currentAngle))
+        local angle = currentAngle + difference * alpha
+        -- Rotate direction separately so opposite inputs cannot cancel velocity.
+        local nextSpeed = magnitude + (math.max(magnitude, speed) - magnitude) * alpha
+        return Vector3.new(math.sin(angle) * nextSpeed, velocity.Y, math.cos(angle) * nextSpeed)
     end
     function sa.airStep(dt)
         if not alive or not sa.airOn or sa.modulesPaused or sa.lobbyBlocked() or sa.menuOpen or UIS:GetFocusedTextBox() then return end
