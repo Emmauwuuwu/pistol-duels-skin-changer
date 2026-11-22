@@ -177,7 +177,7 @@ end
 
 -- ===================== saved choices =====================
 local sel, pat, wear = {}, {}, {}   -- weapon -> skin id / pattern number / wear
-local sa = { airOn = false, airResponse = 8, disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { enabled = true, box = false, boxMode = "2D", names = false, distance = false, health = false, healthMode = "Both", tracers = false, chams = false, glow = false, snaplines = false, weapon = false, teamColor = false, visibility = false, arrows = false, radar = false, fov = false, velocity = false, hitboxes = false, status = false, target = false, throughWalls = true, tracerOrigin = "Bottom", snapOrigin = "Center", color = "Accent", hiddenColor = "Red", maxDistance = 1500, textSize = 13, chamsOpacity = 0.45, fovRadius = 150, radarRange = 200, radarSize = 180, targetUserId = 0, page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
+local sa = { airOn = false, airResponse = 8, disableInLobby = true, spinOn = false, spinSpeed = 1440, thirdPerson = false, thirdDistance = 10, binds = {}, cameraHold = "MouseButton2", esp = { enabled = true, box = false, boxMode = "2D", names = false, distance = false, health = false, healthMode = "Both", tracers = false, chams = false, glow = false, snaplines = false, weapon = false, teamColor = false, visibility = false, arrows = false, radar = false, fov = false, velocity = false, hitboxes = false, status = false, target = false, throughWalls = true, tracerOrigin = "Bottom", snapOrigin = "Center", color = "Accent", hiddenColor = "Red", maxDistance = 1500, textSize = 13, font = "JetBrains Mono", backplates = true, chamsOpacity = 0.45, fovRadius = 150, radarRange = 200, radarSize = 180, targetUserId = 0, page = nil :: Frame?, cleanup = nil :: (() -> ())?, skeleton = true, headDot = true, hideTeam = true, practice = true, thickness = 1.5, dotRadius = 3 }, targetMode = "Closest Part", headWeight = 20, bodyWeight = 50, limbWeight = 30, cameraHead = false, cameraRadius = 80, cameraShowFov = true, cameraOn = false, cameraSmooth = true, cameraSpeed = 8, menuOpen = true, showFov = true, radius = 120, on = false, fov = 20, range = 250, players = true, npcs = true, head = false }
 local seenHelp = false
 local hideArms = false
 -- effect settings (the Effects tab): bullet tracers on your own shots, and a spin on your own weapon model
@@ -239,6 +239,7 @@ function sa.espSettings()
         if type(value) == "boolean" or type(value) == "number" or type(value) == "string" then settings[key] = value end
     end
     settings.lastError = nil
+    settings.fontLoaded = nil
     return settings
 end
 local function save()
@@ -2302,6 +2303,34 @@ do
         thickness = {1, 4}, dotRadius = {2, 10}, textSize = {10, 20}, maxDistance = {50, 5000},
         chamsOpacity = {0.1, 1}, fovRadius = {10, 600}, radarRange = {25, 1000}, radarSize = {120, 300},
     }) do es[key] = math.clamp(es[key], range[1], range[2]) end
+    local fontFaces = {Gotham = Font.fromEnum(Enum.Font.GothamMedium), Mono = Font.fromEnum(Enum.Font.Code)}
+    local customReady = false
+    if type(getcustomasset) == "function" and type(writefile) == "function" and type(isfile) == "function" then
+        local ok, face = pcall(function()
+            local ttf, family = "PDESP-JetBrainsMono.ttf", "PDESP-JetBrainsMono.json"
+            if not isfile(ttf) then
+                local bytes = game:HttpGet("https://raw.githubusercontent.com/Emmauwuuwu/pistol-duels-skin-changer/main/assets/fonts/JetBrainsMono.ttf")
+                assert(#bytes > 10000, "Font download incomplete")
+                writefile(ttf, bytes)
+            end
+            writefile(family, HttpService:JSONEncode({name = "JetBrains Mono", faces = {{name = "Regular", weight = 400, style = "normal", assetId = getcustomasset(ttf)}}}))
+            local loaded = Font.new(getcustomasset(family), Enum.FontWeight.Regular)
+            local probe = Instance.new("TextLabel")
+            probe.FontFace = loaded; probe.Text = "ESP 0123456789"
+            local failed = false
+            local success = pcall(function()
+                game:GetService("ContentProvider"):PreloadAsync({probe}, function(asset, status)
+                    if asset ~= "" and status ~= Enum.AssetFetchStatus.Success then failed = true end
+                end)
+            end)
+            probe:Destroy()
+            assert(success and not failed, "Font asset failed")
+            return loaded
+        end)
+        if ok then fontFaces["JetBrains Mono"] = face; customReady = true end
+    end
+    local function currentFont() return fontFaces[es.font] or fontFaces.Gotham end
+    es.fontLoaded = customReady
     es.features = features
     es.page = make("Frame", { BackgroundTransparency = 1, Visible = false }, win)
     local options = card(0, 0.5, "Player ESP", es.page)
@@ -2312,7 +2341,7 @@ do
             CanvasSize = UDim2.fromOffset(0, height), ScrollBarThickness = 4 }, parent)
     end
     local rows = scroll(options, 32 * (#features + 1))
-    local settings = scroll(appearance, 1140)
+    local settings = scroll(appearance, 1240)
     toggleRow(rows, 0, "ESP enabled", function() return es.enabled end, function(v) es.enabled = v end)
     for i, feature in ipairs(features) do
         local key = feature[1]
@@ -2345,6 +2374,9 @@ do
     slider(settings, 658, "ESP FOV radius", 10, 600, 1, function() return es.fovRadius end, function(v) es.fovRadius = v end, function(v) return tostring(v) .. " px" end)
     slider(settings, 724, "Radar range", 25, 1000, 25, function() return es.radarRange end, function(v) es.radarRange = v end, function(v) return tostring(v) .. " studs" end)
     slider(settings, 790, "Radar size", 120, 300, 10, function() return es.radarSize end, function(v) es.radarSize = v end, function(v) return tostring(v) .. " px" end)
+    choice(1100, "Font", "font", {"JetBrains Mono", "Gotham", "Mono"})
+    toggleRow(settings, 1140, "Text backplates", function() return es.backplates end, function(v) es.backplates = v end)
+    text(settings, customReady and "JetBrains Mono loaded" or "Custom font unavailable: Gotham fallback", 11, C.dim, UDim2.fromOffset(14, 1180), UDim2.new(1, -32, 0, 24))
     local targetButton = button(settings, "", UDim2.fromOffset(14, 860), UDim2.new(1, -32, 0, 32), false)
     local function targetLabel()
         local player = Players:GetPlayerByUserId(es.targetUserId)
@@ -2370,8 +2402,8 @@ do
     end
     local function label(parent, name)
         return make("TextLabel", { Name = name, AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1,
-            Size = UDim2.fromOffset(240, 80), Font = Enum.Font.BuilderSansMedium, TextSize = es.textSize,
-            TextStrokeTransparency = 0.25, TextColor3 = C.text, Visible = false }, parent)
+            Size = UDim2.fromOffset(240, 22), FontFace = currentFont(), TextSize = es.textSize,
+            TextStrokeTransparency = 0.45, TextColor3 = C.text, Visible = false }, parent)
     end
     local function dot(parent, name)
         local frame = line(parent, name)
@@ -2407,7 +2439,7 @@ do
     local edges = {{1,2},{1,3},{1,5},{2,4},{2,6},{3,4},{3,7},{4,8},{5,6},{5,7},{6,8},{7,8}}
     local entries, nextScan = {}, 0
     local combatRay
-    g(function() combatRay = requireGame(RS.Combat.CombatRaycast) end)
+    g(function() combatRay = require(RS.Combat.CombatRaycast) end)
     local function remove(character)
         local entry = entries[character]
         entry.group:Destroy(); entry.radarDot:Destroy()
@@ -2426,6 +2458,11 @@ do
         entry.head = dot(group, "HeadDot")
         entry.name = label(group, "Name")
         entry.details = label(group, "Details")
+        entry.state = label(group, "State")
+        for _, item in ipairs({entry.name, entry.details, entry.state}) do
+            item.BackgroundColor3 = Color3.fromRGB(12, 15, 21)
+            make("UICorner", {CornerRadius = UDim.new(0, 3)}, item)
+        end
         entry.tracer = line(group, "Tracer")
         entry.snap = line(group, "Snapline")
         entry.velocity = line(group, "Velocity")
@@ -2575,7 +2612,7 @@ do
                 end
                 entry.name.Visible = es.names and onScreen and front
                 entry.name.Text = owner and owner.Name or character.Name
-                entry.name.Position = UDim2.fromOffset(point.X, low.Y - es.textSize)
+                entry.name.Position = UDim2.fromOffset(point.X, low.Y - es.textSize / 2 - 7)
                 local details = {}
                 if es.distance then details[#details + 1] = tostring(math.floor(distance + 0.5)) .. " studs" end
                 if es.health and es.healthMode ~= "Bar" then details[#details + 1] = tostring(math.ceil(humanoid.Health)) .. " HP" end
@@ -2585,14 +2622,22 @@ do
                     if not weapon then local tool = character:FindFirstChildOfClass("Tool"); weapon = tool and tool.Name end
                     details[#details + 1] = weapon and tostring(weapon) or "Unarmed"
                 end
-                if es.status then details[#details + 1] = statusOf(character, owner, humanoid, root) end
-                if es.visibility then details[#details + 1] = entry.visible and "Visible" or "Obstructed" end
+                local states = {}
+                if es.status then states[#states + 1] = statusOf(character, owner, humanoid, root) end
+                if es.visibility then states[#states + 1] = entry.visible and "Visible" or "Obstructed" end
+                entry.state.Text = table.concat(states, " / ")
+                entry.state.Visible = #states > 0 and onScreen and front
+                entry.state.Position = UDim2.fromOffset(point.X, high.Y + es.textSize / 2 + 7 + (#details > 0 and es.textSize + 6 or 0))
                 entry.details.Visible = #details > 0 and onScreen and front
-                entry.details.Text = table.concat(details, " · ")
-                entry.details.Position = UDim2.fromOffset(point.X, high.Y + es.textSize)
-                entry.details.Size = UDim2.fromOffset(420, es.textSize * 2)
-                entry.name.TextColor3, entry.details.TextColor3 = color, color
-                entry.name.TextSize, entry.details.TextSize = es.textSize, es.textSize
+                entry.details.Text = table.concat(details, "  |  ")
+                entry.details.Position = UDim2.fromOffset(point.X, high.Y + es.textSize / 2 + 7)
+                for _, item in ipairs({entry.name, entry.details, entry.state}) do
+                    item.FontFace = currentFont()
+                    item.TextSize = es.textSize
+                    item.TextColor3 = item == entry.name and Color3.fromRGB(245, 247, 250) or color:Lerp(Color3.new(1, 1, 1), 0.45)
+                    item.BackgroundTransparency = es.backplates and 0.28 or 1
+                    item.Size = UDim2.fromOffset(math.clamp(item.TextBounds.X + 12, 24, 650), es.textSize + 4)
+                end
                 entry.health.Visible = es.health and es.healthMode ~= "Number" and front and onScreen
                 if entry.health.Visible then
                     local ratio = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
