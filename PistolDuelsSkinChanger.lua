@@ -2488,7 +2488,7 @@ do
 	for _, w in ipairs(weapons) do
 		local labels, byLabel = { "Default" }, {}
 		for _, s in ipairs(skinsOf[w] or {}) do
-			local label = s.display .. (s.staff and "  (Staff)" or "")
+			local label = s.display .. "  .  " .. s.rarity
 			while byLabel[label] do label = label .. " " end   -- a dropdown needs one row per name
 			byLabel[label] = s.id
 			labels[#labels + 1] = label
